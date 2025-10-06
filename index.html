@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Pass Jeunes</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
+  <script>if (window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';}</script>
+  <style>
+    :root {
+      --pj-blue:#1C2C5B;
+      --pj-green:#3CB371;
+      --pj-yellow:#F5C842;
+      --pj-neutral:#F3F4F6;
+      --pj-text:#0F172A;
+    }
+    body { font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
+    .hero-visual {
+      background-size: cover;
+      background-position: center;
+      min-height: 180px;
+      border-radius: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, rgba(28,44,91,0.82), rgba(28,44,91,0.55));
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+    .kpi-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.08;
+      background-size: 160%;
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;
+    }
+    .section-badge img {
+      width: 28px;
+      height: 28px;
+      object-fit: cover;
+      border-radius: 0.75rem;
+    }
+    .empty-state {
+      border: 2px dashed rgba(15,23,42,0.08);
+      border-radius: 1rem;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      background: rgba(243,244,246,0.7);
+    }
+    .table-container {
+      max-height: 480px;
+      overflow: auto;
+    }
+    .gallery-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+    .gallery-item {
+      border-radius: 1rem;
+      border: 2px solid transparent;
+      overflow: hidden;
+      background: white;
+      box-shadow: 0 10px 30px -18px rgba(0,0,0,0.4);
+    }
+    .gallery-item[data-selected="true"] {
+      border-color: var(--pj-green);
+    }
+    .chart-wrapper {
+      position: relative;
+      min-height: 280px;
+    }
+    .chart-scroll {
+      max-height: 720px;
+      overflow-y: auto;
+    }
+    body.dragging::after {
+      content: 'Déposez votre fichier ici';
+      position: fixed;
+      inset: 0;
+      background: rgba(28,44,91,0.65);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      z-index: 9999;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-[color:var(--pj-neutral)] text-[color:var(--pj-text)] min-h-screen">
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm uppercase tracking-[0.3em] text-slate-400">Pass Jeunes</p>
+        <h1 class="text-2xl font-bold text-[color:var(--pj-blue)]">Dashboard scans2025</h1>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[color:var(--pj-blue)] text-white font-medium cursor-pointer">
+          <input id="charte-input" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" />
+          <span>Importer la charte (PDF/Images)</span>
+        </label>
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] font-medium cursor-pointer">
+          <input id="data-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <span>Importer un fichier (Excel / CSV)</span>
+        </label>
+        <button id="reset-filters" class="px-4 py-2 rounded-full bg-[color:var(--pj-yellow)] text-[color:var(--pj-text)] font-semibold">Réinitialiser filtres</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-6 py-8 grid gap-8 lg:grid-cols-[320px_1fr]">
+    <aside class="bg-white rounded-3xl shadow-lg p-6 space-y-8 self-start sticky top-6">
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Chargement des données</h2>
+        <div class="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 text-sm space-y-3">
+          <p>Déposez un fichier <strong>scans2025.xlsx</strong> ou un CSV avec les colonnes attendues.</p>
+          <p class="text-xs text-slate-500">Colonnes : Le partenaire, L'offre, Date de scan, Valeur de l'offre.</p>
+          <div id="load-status" class="text-xs text-slate-600"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Filtres</h2>
+        <div class="space-y-5 text-sm">
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Période</label>
+            <div class="flex gap-2">
+              <input type="date" id="filter-date-start" class="w-1/2 rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)]" />
+              <input type="date" id="filter-date-end" class="w-1/2 rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)]" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Partenaires</label>
+            <select id="filter-partenaires" multiple class="w-full rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)] h-32"></select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Offres</label>
+            <select id="filter-offres" multiple class="w-full rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)] h-32"></select>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Palette détectée</h2>
+        <div id="palette-preview" class="flex gap-2"></div>
+        <p class="text-xs text-slate-500 mt-2">Les couleurs sont automatiquement appliquées aux graphiques et composants.</p>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Visuels importés</h2>
+        <div id="visual-gallery" class="gallery-grid text-xs text-slate-500"></div>
+        <div class="space-y-2 text-sm">
+          <label class="flex items-center gap-2"><select id="visual-hero" class="flex-1 rounded-xl border-slate-200"></select><span>Header</span></label>
+          <label class="flex items-center gap-2"><select id="visual-watermark" class="flex-1 rounded-xl border-slate-200"></select><span>KPI</span></label>
+          <label class="flex items-center gap-2"><select id="visual-empty" class="flex-1 rounded-xl border-slate-200"></select><span>Empty state</span></label>
+          <label class="flex items-center gap-2"><select id="visual-section" class="flex-1 rounded-xl border-slate-200"></select><span>Sections</span></label>
+        </div>
+      </section>
+    </aside>
+
+    <main class="space-y-8">
+      <section class="hero-visual" id="hero-visual">
+        <div class="hero-content p-10 text-white space-y-4">
+          <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs uppercase tracking-[0.2em]">Smart analyse Pass Jeunes</div>
+          <h2 class="text-3xl font-semibold">Analyse dynamique des scans</h2>
+          <p class="max-w-xl text-white/80">Importez vos données, sélectionnez la période et laissez la plateforme adapter automatiquement les indicateurs, graphiques et mises en valeur.</p>
+        </div>
+      </section>
+
+      <section>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" id="kpi-container">
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Total scans</p>
+            <p id="kpi-scans" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Montant total consommé</p>
+            <p id="kpi-amount" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Offres distinctes</p>
+            <p id="kpi-offres" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Partenaires distincts</p>
+            <p id="kpi-partenaires" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="space-y-6" id="charts-section" data-visual-slot="sections">
+        <header class="flex items-center justify-between">
+          <div class="flex items-center gap-3 section-badge">
+            <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+              <img id="section-visual-img" alt="" />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Visualisations clés</h3>
+              <p class="text-sm text-slate-500">Adaptation automatique selon le volume et la période analysée.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="inline-flex items-center gap-1"><input type="radio" name="time-aggregation" value="month" checked /> <span>Mois</span></label>
+            <label class="inline-flex items-center gap-1"><input type="radio" name="time-aggregation" value="quarter" /> <span>Trimestre</span></label>
+          </div>
+        </header>
+        <div class="space-y-6">
+          <article class="bg-white rounded-3xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Consommation par offre</h4>
+              <div class="flex items-center flex-wrap gap-2 text-xs justify-end">
+                <span id="top-offres-caption" class="px-3 py-1 rounded-full bg-[color:var(--pj-neutral)] text-[color:var(--pj-blue)]"></span>
+                <button id="top-offres-more" class="hidden px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Voir +</button>
+                <button id="top-offres-all" class="hidden px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Afficher tout</button>
+                <input id="top-offres-search" class="hidden rounded-full border border-slate-200 px-3 py-1" placeholder="Rechercher" />
+                <button data-chart="chart-offres" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Exporter PNG</button>
+              </div>
+            </div>
+            <div class="chart-scroll">
+              <div class="chart-wrapper">
+                <canvas id="chart-offres"></canvas>
+              </div>
+            </div>
+          </article>
+          <article class="bg-white rounded-3xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Tendance mensuelle des montants</h4>
+              <button data-chart="chart-montants" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter PNG</button>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-montants"></canvas>
+            </div>
+          </article>
+          <article class="bg-white rounded-3xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Évolution du nombre de scans</h4>
+              <button data-chart="chart-scans" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter PNG</button>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-scans"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-3xl shadow-md p-6" data-visual-slot="sections">
+        <header class="flex items-center gap-3 mb-4 section-badge">
+          <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+            <img alt="" />
+          </div>
+          <div>
+            <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Top offres par mois</h3>
+            <p class="text-sm text-slate-500">Montants et volume des trois meilleures offres.</p>
+          </div>
+        </header>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500 uppercase text-xs">
+              <tr>
+                <th class="py-2 pr-4">Mois</th>
+                <th class="py-2 pr-4">Top offres (montant)</th>
+                <th class="py-2 pr-4">Top offres (# scans)</th>
+              </tr>
+            </thead>
+            <tbody id="table-top-offres" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-3xl shadow-md p-6" data-visual-slot="sections">
+        <header class="flex items-center justify-between mb-4 section-badge">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+              <img alt="" />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Table détaillée</h3>
+              <p class="text-sm text-slate-500">Filtrable, triable, exportable en CSV.</p>
+            </div>
+          </div>
+          <button id="export-table" class="px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter CSV</button>
+        </header>
+        <div class="table-container">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500 uppercase text-xs">
+              <tr>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="date">Date</th>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="partenaire">Partenaire</th>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="offre">Offre</th>
+                <th class="py-2 pr-4 text-right cursor-pointer" data-sort="montant">Valeur</th>
+              </tr>
+            </thead>
+            <tbody id="table-details" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div class="flex items-center justify-between mt-4 text-sm">
+          <span id="table-pagination-info" class="text-slate-500"></span>
+          <div class="space-x-2">
+            <button id="table-prev" class="px-3 py-1 rounded-full border border-slate-200">Précédent</button>
+            <button id="table-next" class="px-3 py-1 rounded-full border border-slate-200">Suivant</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="empty-state" class="hidden empty-state">
+        <div class="flex flex-col items-center gap-4">
+          <img id="empty-state-img" class="w-48 h-48 object-contain" alt="" />
+          <div>
+            <h3 class="text-xl font-semibold text-[color:var(--pj-blue)]">Aucune donnée pour ces filtres</h3>
+            <p class="text-sm text-slate-500">Modifiez la période, les partenaires ou les offres pour retrouver des résultats.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const numberFormatter = new Intl.NumberFormat('fr-MA');
+    const currencyFormatter = new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 2 });
+
+    const state = {
+      rows: [],
+      filtered: [],
+      palette: ['#1C2C5B', '#3CB371', '#F5C842', '#FF8F6B', '#4C4CE6'],
+      visuals: [],
+      assignments: { hero: null, watermark: null, empty: null, section: null },
+      charts: {},
+      topOfferLimit: 0,
+      topOfferSearch: '',
+      tablePage: 0,
+      tablePageSize: 20,
+      tableSort: { key: 'date', direction: 'desc' },
+      aggregation: 'month',
+      manualAggregation: null
+    };
+
+    let dragCounter = 0;
+
+    const debounce = (fn, delay = 200) => {
+      let t;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
+      };
+    };
+
+    const lightenColor = (hex, amt = -20) => {
+      let usePound = false;
+      let color = hex;
+      if (color[0] === '#') { color = color.slice(1); usePound = true; }
+      if (color.length === 3) { color = color.split('').map(c => c + c).join(''); }
+      const num = parseInt(color, 16);
+      let r = (num >> 16) + amt;
+      let g = ((num >> 8) & 0x00FF) + amt;
+      let b = (num & 0x0000FF) + amt;
+      r = Math.max(Math.min(255, r), 0);
+      g = Math.max(Math.min(255, g), 0);
+      b = Math.max(Math.min(255, b), 0);
+      return (usePound ? '#' : '') + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    };
+
+    function updateRootPalette(colors) {
+      if (!colors || !colors.length) return;
+      state.palette = colors.map(c => c.startsWith('#') ? c : `#${c}`);
+      const root = document.documentElement;
+      const [blue, green, yellow, neutral, text] = [
+        state.palette[0] || '#1C2C5B',
+        state.palette[1] || '#3CB371',
+        state.palette[2] || '#F5C842',
+        state.palette[3] || '#F3F4F6',
+        state.palette[4] || '#0F172A'
+      ];
+      root.style.setProperty('--pj-blue', blue);
+      root.style.setProperty('--pj-green', green);
+      root.style.setProperty('--pj-yellow', yellow);
+      root.style.setProperty('--pj-neutral', neutral);
+      root.style.setProperty('--pj-text', text);
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.style.setProperty('--watermark', state.assignments.watermark || '');
+        card.style.setProperty('color', 'var(--pj-text)');
+      });
+      renderPalettePreview();
+      updateAssignments();
+      refreshCharts();
+    }
+
+    function renderPalettePreview() {
+      const container = document.getElementById('palette-preview');
+      container.innerHTML = '';
+      state.palette.forEach((color, idx) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'w-10 h-10 rounded-2xl shadow-inner flex flex-col justify-center items-center text-[10px] text-white/90';
+        swatch.style.backgroundColor = color;
+        swatch.innerHTML = `<span>${idx + 1}</span>`;
+        container.appendChild(swatch);
+      });
+    }
+
+    function formatShortNumber(value) {
+      if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} Md`;
+      if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)} M`;
+      if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)} k`;
+      return numberFormatter.format(value);
+    }
+
+    function normalizeRow(row) {
+      const mapping = {
+        'le partenaire': 'partenaire',
+        'partenaire': 'partenaire',
+        "l'offre": 'offre',
+        'offre': 'offre',
+        'date de scan': 'date_scan',
+        'date_scan': 'date_scan',
+        'date': 'date_scan',
+        "valeur de l'offre": 'valeur',
+        'valeur': 'valeur',
+        'montant': 'valeur'
+      };
+      const normalized = { partenaire: '', offre: '', date_scan: '', valeur: null };
+      Object.keys(row).forEach(key => {
+        const clean = key.trim().toLowerCase();
+        const mapped = mapping[clean];
+        if (mapped) normalized[mapped] = row[key];
+      });
+      return normalized;
+    }
+
+    function parseValue(raw) {
+      if (raw === null || raw === undefined) return 0;
+      if (typeof raw === 'number') return raw;
+      const sanitized = String(raw).replace(/[^0-9,.-]/g, '').replace(',', '.');
+      const parsed = parseFloat(sanitized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function parseDate(raw) {
+      if (!raw) return null;
+      if (raw instanceof Date && !isNaN(raw)) return raw;
+      const text = String(raw).trim();
+      const [d1, d2] = text.split(' ');
+      const candidate = d2 ? `${d1} ${d2}` : text;
+      let date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+        date = new Date(candidate);
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(candidate)) {
+        const [dd, mm, yyyy] = candidate.split('/').map(Number);
+        date = new Date(yyyy, mm - 1, dd);
+      } else if (!Number.isNaN(Number(candidate))) {
+        date = XLSX.SSF.parse_date_code(Number(candidate));
+        if (date) date = new Date(date.y, date.m - 1, date.d);
+      } else {
+        date = new Date(candidate);
+      }
+      return date && !isNaN(date) ? date : null;
+    }
+
+    function computeDerived(rows) {
+      return rows.map(row => {
+        const date = parseDate(row.date_scan);
+        const valeur = parseValue(row.valeur);
+        const mois = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` : null;
+        const trimestre = date ? `${date.getFullYear()}-T${Math.floor(date.getMonth() / 3) + 1}` : null;
+        return {
+          partenaire: (row.partenaire || '').toString().trim(),
+          offre: (row.offre || '').toString().trim(),
+          date,
+          valeur,
+          mois,
+          trimestre
+        };
+      }).filter(r => r.partenaire && r.offre && r.date);
+    }
+
+    async function loadDefaultWorkbook() {
+      try {
+        const response = await fetch('scans2025.xlsx');
+        if (!response.ok) throw new Error('Fichier non disponible');
+        const arrayBuffer = await response.arrayBuffer();
+        handleWorkbook(arrayBuffer, 'scans2025.xlsx');
+        document.getElementById('load-status').textContent = 'scans2025.xlsx chargé automatiquement.';
+      } catch (error) {
+        document.getElementById('load-status').textContent = 'Importez votre fichier pour commencer.';
+      }
+    }
+
+    function handleWorkbook(buffer, filename) {
+      try {
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheetName = workbook.SheetNames.includes('Worksheet') ? 'Worksheet' : workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        const normalized = rows.map(normalizeRow);
+        state.rows = computeDerived(normalized);
+        state.manualAggregation = null;
+        state.tablePage = 0;
+        populateFilters();
+        applyFilters();
+        document.getElementById('load-status').textContent = `${filename} importé (${state.rows.length} lignes).`;
+      } catch (error) {
+        document.getElementById('load-status').textContent = `Erreur de lecture : ${error.message}`;
+        console.error(error);
+      }
+    }
+
+    async function handleCsv(file) {
+      const text = await file.text();
+      const workbook = XLSX.read(text, { type: 'string' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      const normalized = rows.map(normalizeRow);
+      state.rows = computeDerived(normalized);
+      state.manualAggregation = null;
+      state.tablePage = 0;
+      populateFilters();
+      applyFilters();
+      document.getElementById('load-status').textContent = `${file.name} importé (${state.rows.length} lignes).`;
+    }
+
+    function handleDataFile(file) {
+      if (!file) return;
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        handleCsv(file);
+      } else {
+        file.arrayBuffer().then(buffer => handleWorkbook(buffer, file.name));
+      }
+    }
+
+    function populateFilters() {
+      const partners = [...new Set(state.rows.map(r => r.partenaire))].sort((a, b) => a.localeCompare(b));
+      const offers = [...new Set(state.rows.map(r => r.offre))].sort((a, b) => a.localeCompare(b));
+      fillSelect(document.getElementById('filter-partenaires'), partners);
+      fillSelect(document.getElementById('filter-offres'), offers);
+      const dates = state.rows.map(r => r.date.getTime());
+      if (dates.length) {
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        document.getElementById('filter-date-start').value = min.toISOString().split('T')[0];
+        document.getElementById('filter-date-end').value = max.toISOString().split('T')[0];
+      }
+    }
+
+    function fillSelect(select, values) {
+      const current = new Set(Array.from(select.selectedOptions).map(o => o.value));
+      select.innerHTML = '';
+      values.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        if (current.has(value)) option.selected = true;
+        select.appendChild(option);
+      });
+    }
+
+    function applyFilters() {
+      state.tablePage = 0;
+      state.topOfferLimit = 0;
+      state.topOfferSearch = '';
+      const searchInput = document.getElementById('top-offres-search');
+      if (searchInput) searchInput.value = '';
+      const start = document.getElementById('filter-date-start').value;
+      const end = document.getElementById('filter-date-end').value;
+      const selectedPartners = new Set(Array.from(document.getElementById('filter-partenaires').selectedOptions).map(o => o.value));
+      const selectedOffers = new Set(Array.from(document.getElementById('filter-offres').selectedOptions).map(o => o.value));
+
+      state.filtered = state.rows.filter(row => {
+        if (start && row.date < new Date(start)) return false;
+        if (end) {
+          const endDate = new Date(end);
+          endDate.setHours(23, 59, 59, 999);
+          if (row.date > endDate) return false;
+        }
+        if (selectedPartners.size && !selectedPartners.has(row.partenaire)) return false;
+        if (selectedOffers.size && !selectedOffers.has(row.offre)) return false;
+        return true;
+      });
+
+      if (state.filtered.length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+      } else {
+        document.getElementById('empty-state').classList.add('hidden');
+      }
+
+      computeKpis();
+      renderCharts();
+      renderTables();
+    }
+
+    function computeKpis() {
+      const totalScans = state.filtered.length;
+      const montant = state.filtered.reduce((sum, row) => sum + (row.valeur || 0), 0);
+      const offres = new Set(state.filtered.map(row => row.offre)).size;
+      const partenaires = new Set(state.filtered.map(row => row.partenaire)).size;
+
+      document.getElementById('kpi-scans').textContent = numberFormatter.format(totalScans);
+      document.getElementById('kpi-amount').textContent = currencyFormatter.format(montant);
+      document.getElementById('kpi-offres').textContent = numberFormatter.format(offres);
+      document.getElementById('kpi-partenaires').textContent = numberFormatter.format(partenaires);
+    }
+
+    function groupBy(key) {
+      return state.filtered.reduce((acc, row) => {
+        const group = row[key];
+        if (!group) return acc;
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(row);
+        return acc;
+      }, {});
+    }
+
+    function aggregateTemporal() {
+      if (state.aggregation === 'quarter') {
+        const grouped = groupBy('trimestre');
+        return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([period, rows]) => ({
+          period,
+          total: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+          scans: rows.length
+        }));
+      }
+      const grouped = groupBy('mois');
+      return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([period, rows]) => ({
+        period,
+        total: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+        scans: rows.length
+      }));
+    }
+
+    function determineAggregation() {
+      if (state.manualAggregation) {
+        state.aggregation = state.manualAggregation;
+      } else {
+        const months = new Set(state.filtered.map(row => row.mois)).size;
+        state.aggregation = months > 36 ? 'quarter' : 'month';
+      }
+      document.querySelectorAll('input[name="time-aggregation"]').forEach(input => {
+        input.checked = input.value === state.aggregation;
+      });
+    }
+
+    function applyTopOfferRules(offreGroups, universe = offreGroups.length) {
+      const totalOffers = offreGroups.length;
+      let limit = totalOffers;
+      let caption = '';
+      const moreBtn = document.getElementById('top-offres-more');
+      const allBtn = document.getElementById('top-offres-all');
+      const search = document.getElementById('top-offres-search');
+      moreBtn.classList.add('hidden');
+      allBtn.classList.add('hidden');
+      search.classList.add('hidden');
+
+      if (totalOffers <= 10) {
+        limit = totalOffers;
+        caption = `${totalOffers} offres affichées`;
+      } else if (totalOffers <= 30) {
+        limit = Math.min(15, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+      } else if (totalOffers <= 100) {
+        limit = Math.min(20 + state.topOfferLimit, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+        if (limit < totalOffers) {
+          moreBtn.classList.remove('hidden');
+          moreBtn.textContent = `Voir +${Math.min(20, totalOffers - limit)}`;
+        }
+      } else {
+        limit = Math.min(25 + state.topOfferLimit, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+        search.classList.remove('hidden');
+        allBtn.classList.remove('hidden');
+        if (!state.topOfferLimit) {
+          allBtn.textContent = 'Afficher tout';
+        }
+      }
+      if (universe !== totalOffers) {
+        caption += ` (filtré sur ${universe})`;
+      }
+
+      document.getElementById('top-offres-caption').textContent = caption;
+      return offreGroups.slice(0, Math.min(limit, totalOffers));
+    }
+
+    function filterOffersBySearch(groups) {
+      if (!state.topOfferSearch) return groups;
+      return groups.filter(group => group.name.toLowerCase().includes(state.topOfferSearch.toLowerCase()));
+    }
+
+    function renderCharts() {
+      determineAggregation();
+      const aggregated = aggregateTemporal();
+      renderLineChart('chart-montants', aggregated.map(a => a.period), aggregated.map(a => a.total));
+      renderLineChart('chart-scans', aggregated.map(a => a.period), aggregated.map(a => a.scans), true);
+
+      const groupedOffers = Object.entries(groupBy('offre')).map(([offre, rows]) => ({
+        name: offre,
+        montant: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+        scans: rows.length
+      })).sort((a, b) => b.montant - a.montant);
+
+      const filteredBySearch = filterOffersBySearch(groupedOffers);
+      const displayGroups = applyTopOfferRules(filteredBySearch, groupedOffers.length);
+
+      const labels = displayGroups.map(g => abbreviate(g.name));
+      const tooltipLabels = displayGroups.map(g => g.name);
+      const data = displayGroups.map(g => g.montant);
+      const colors = displayGroups.map((_, idx) => state.palette[idx % state.palette.length]);
+      const orientation = displayGroups.length > 15 ? 'y' : 'x';
+      const minHeight = Math.min(720, Math.max(280, displayGroups.length * 16));
+      const canvas = document.getElementById('chart-offres');
+      canvas.parentElement.style.minHeight = `${minHeight}px`;
+
+      const axisConfig = orientation === 'y'
+        ? {
+            x: {
+              ticks: { callback: value => formatShortNumber(value) },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            },
+            y: {
+              ticks: { autoSkip: false, callback: (value, index) => labels[index] },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            }
+          }
+        : {
+            x: {
+              ticks: {
+                autoSkip: false,
+                maxRotation: labels.some(label => label.length > 12) ? 60 : 30,
+                callback: (value, index) => labels[index]
+              },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            },
+            y: {
+              ticks: { callback: value => formatShortNumber(value) },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            }
+          };
+
+      const config = {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Montant consommé',
+            data,
+            backgroundColor: colors.map(color => `${color}CC`),
+            borderColor: colors,
+            hoverBackgroundColor: colors.map(color => lightenColor(color, -20)),
+            borderWidth: 1.5,
+            maxBarThickness: orientation === 'y' ? 28 : 42,
+            categoryPercentage: orientation === 'y' ? 0.7 : 0.8,
+            barPercentage: orientation === 'y' ? 0.9 : 0.8
+          }]
+        },
+        options: {
+          indexAxis: orientation,
+          maintainAspectRatio: false,
+          responsive: true,
+          interaction: { intersect: false, mode: 'nearest' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: items => tooltipLabels[items[0].dataIndex],
+                label: context => `${currencyFormatter.format(context.parsed.y ?? context.parsed.x)}`
+              }
+            }
+          },
+          scales: axisConfig
+        }
+      };
+
+      updateChart('chart-offres', config);
+    }
+
+    function renderLineChart(id, labels, data, countMode = false) {
+      const canvas = document.getElementById(id);
+      const config = {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: countMode ? 'Nombre de scans' : 'Montant',
+            data,
+            fill: true,
+            tension: 0.35,
+            backgroundColor: `${state.palette[0]}33`,
+            borderColor: state.palette[0],
+            pointBackgroundColor: state.palette[1] || state.palette[0],
+            pointBorderWidth: 2,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            },
+            y: {
+              ticks: {
+                callback: value => countMode ? numberFormatter.format(value) : formatShortNumber(value)
+              },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: context => countMode ? `${numberFormatter.format(context.parsed.y)} scans` : `${currencyFormatter.format(context.parsed.y)}`
+              }
+            }
+          }
+        }
+      };
+      updateChart(id, config);
+    }
+
+    function updateChart(id, config) {
+      if (state.charts[id]) {
+        state.charts[id].destroy();
+      }
+      state.charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
+    }
+
+    function refreshCharts() {
+      Object.keys(state.charts).forEach(id => state.charts[id].destroy());
+      state.charts = {};
+      renderCharts();
+    }
+
+    function abbreviate(label) {
+      if (label.length <= 24) return label;
+      return `${label.slice(0, 24)}…`;
+    }
+
+    function renderTables() {
+      const groupedByMonth = aggregateTemporal();
+      const monthlyDetails = groupedByMonth.map(group => {
+        const rows = state.filtered.filter(row => (state.aggregation === 'quarter' ? row.trimestre : row.mois) === group.period);
+        const montantTop = Object.entries(rows.reduce((acc, row) => {
+          acc[row.offre] = (acc[row.offre] || 0) + (row.valeur || 0);
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const scansTop = Object.entries(rows.reduce((acc, row) => {
+          acc[row.offre] = (acc[row.offre] || 0) + 1;
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        return {
+          period: group.period,
+          montantTop,
+          scansTop
+        };
+      });
+      const tbody = document.getElementById('table-top-offres');
+      tbody.innerHTML = '';
+      monthlyDetails.forEach(item => {
+        const tr = document.createElement('tr');
+        const montantList = item.montantTop.map(([offre, montant]) => `<span class="block">${offre} – <strong>${currencyFormatter.format(montant)}</strong></span>`).join('') || '<span class="text-slate-400">Aucune donnée</span>';
+        const scansList = item.scansTop.map(([offre, scans]) => `<span class="block">${offre} – <strong>${numberFormatter.format(scans)}</strong></span>`).join('') || '<span class="text-slate-400">Aucune donnée</span>';
+        tr.innerHTML = `
+          <td class="py-3 pr-4 text-[color:var(--pj-blue)] font-semibold">${item.period}</td>
+          <td class="py-3 pr-4">${montantList}</td>
+          <td class="py-3 pr-4">${scansList}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const sorted = [...state.filtered].sort((a, b) => {
+        const { key, direction } = state.tableSort;
+        const factor = direction === 'asc' ? 1 : -1;
+        if (key === 'date') return factor * (a.date - b.date);
+        if (key === 'montant') return factor * ((a.valeur || 0) - (b.valeur || 0));
+        return factor * a[key].localeCompare(b[key]);
+      });
+
+      const startIndex = state.tablePage * state.tablePageSize;
+      const pageRows = sorted.slice(startIndex, startIndex + state.tablePageSize);
+      const tbodyDetails = document.getElementById('table-details');
+      tbodyDetails.innerHTML = '';
+      pageRows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2 pr-4">${row.date.toLocaleDateString('fr-MA')}</td>
+          <td class="py-2 pr-4">${row.partenaire}</td>
+          <td class="py-2 pr-4">${row.offre}</td>
+          <td class="py-2 pr-4 text-right">${currencyFormatter.format(row.valeur || 0)}</td>
+        `;
+        tbodyDetails.appendChild(tr);
+      });
+      const info = document.getElementById('table-pagination-info');
+      if (!sorted.length) {
+        info.textContent = '0 entrée';
+      } else {
+        info.textContent = `${startIndex + 1}-${Math.min(startIndex + state.tablePageSize, sorted.length)} sur ${numberFormatter.format(sorted.length)} entrées`;
+      }
+    }
+
+    function exportTableCsv() {
+      const headers = ['Date', 'Partenaire', 'Offre', 'Valeur'];
+      const rows = state.filtered.map(row => [row.date.toISOString().split('T')[0], row.partenaire, row.offre, row.valeur]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'scans-filtrés.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportChart(id) {
+      const chart = state.charts[id];
+      if (!chart) return;
+      const link = document.createElement('a');
+      link.href = chart.toBase64Image('image/png', 1);
+      link.download = `${id}.png`;
+      link.click();
+    }
+
+    function updateAssignments() {
+      const hero = state.assignments.hero;
+      const watermark = state.assignments.watermark;
+      const empty = state.assignments.empty;
+      const section = state.assignments.section;
+
+      const heroEl = document.getElementById('hero-visual');
+      heroEl.style.backgroundImage = hero ? `url(${hero})` : 'linear-gradient(120deg, var(--pj-blue), #1C2C5B)';
+
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.style.setProperty('--watermark', watermark || '');
+        if (watermark) {
+          card.style.backgroundImage = `linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)), url(${watermark})`;
+        } else {
+          card.style.backgroundImage = 'none';
+        }
+        card.style.backgroundSize = watermark ? 'cover' : 'auto';
+        card.style.backgroundRepeat = watermark ? 'no-repeat' : 'repeat';
+        card.style.backgroundPosition = 'center';
+        card.style.backgroundBlendMode = watermark ? 'lighten' : 'normal';
+      });
+
+      const sectionImg = document.getElementById('section-visual-img');
+      if (sectionImg) sectionImg.src = section || '';
+      document.querySelectorAll('[data-visual-slot="sections"] img').forEach(img => {
+        img.src = section || '';
+      });
+
+      const emptyImg = document.getElementById('empty-state-img');
+      if (emptyImg) emptyImg.src = empty || '';
+    }
+
+    function syncVisualSelectors() {
+      const heroSelect = document.getElementById('visual-hero');
+      const watermarkSelect = document.getElementById('visual-watermark');
+      const emptySelect = document.getElementById('visual-empty');
+      const sectionSelect = document.getElementById('visual-section');
+      if (heroSelect) heroSelect.value = state.assignments.hero || '';
+      if (watermarkSelect) watermarkSelect.value = state.assignments.watermark || '';
+      if (emptySelect) emptySelect.value = state.assignments.empty || '';
+      if (sectionSelect) sectionSelect.value = state.assignments.section || '';
+    }
+
+    async function handleCharte(files) {
+      if (!files || !files.length) return;
+      const palettes = [];
+      const visuals = [];
+      for (const file of files) {
+        if (file.type === 'application/pdf') {
+          const buffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: context, viewport }).promise;
+            const dataUrl = canvas.toDataURL('image/png');
+            visuals.push({ name: `${file.name} – Page ${pageNum}`, url: dataUrl });
+            const palette = await extractPaletteFromImage(dataUrl);
+            if (palette.length) palettes.push(palette);
+          }
+        } else if (file.type.startsWith('image/')) {
+          const dataUrl = await readFileAsDataUrl(file);
+          visuals.push({ name: file.name, url: dataUrl });
+          const palette = await extractPaletteFromImage(dataUrl);
+          if (palette.length) palettes.push(palette);
+        }
+      }
+
+      if (visuals.length) {
+        state.visuals = visuals;
+        populateVisualSelectors();
+        state.assignments.hero = visuals[0].url;
+        state.assignments.section = visuals[0].url;
+        state.assignments.watermark = visuals[0].url;
+        state.assignments.empty = visuals[0].url;
+        syncVisualSelectors();
+        updateAssignments();
+      }
+      if (palettes.length) {
+        const merged = palettes.flat().slice(0, 5);
+        updateRootPalette(merged);
+      }
+    }
+
+    function populateVisualSelectors() {
+      const gallery = document.getElementById('visual-gallery');
+      gallery.innerHTML = '';
+      const selects = [
+        document.getElementById('visual-hero'),
+        document.getElementById('visual-watermark'),
+        document.getElementById('visual-empty'),
+        document.getElementById('visual-section')
+      ];
+      selects.forEach(select => select.innerHTML = '<option value="">Par défaut</option>');
+      state.visuals.forEach((visual, idx) => {
+        const card = document.createElement('div');
+        card.className = 'gallery-item';
+        card.innerHTML = `
+          <div class="h-24 bg-slate-100 overflow-hidden">
+            <img src="${visual.url}" alt="${visual.name}" class="w-full h-full object-cover" />
+          </div>
+          <div class="p-3">
+            <p class="font-semibold text-[color:var(--pj-blue)]">${visual.name}</p>
+          </div>
+        `;
+        gallery.appendChild(card);
+        selects.forEach(select => {
+          const option = document.createElement('option');
+          option.value = visual.url;
+          option.textContent = visual.name;
+          if (idx === 0) option.selected = true;
+          select.appendChild(option);
+        });
+      });
+      syncVisualSelectors();
+    }
+
+    async function extractPaletteFromImage(url) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const colorThief = new ColorThief();
+            const palette = colorThief.getPalette(img, 5) || [];
+            resolve(palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2])));
+          } catch (error) {
+            console.error('Palette error', error);
+            resolve([]);
+          }
+        };
+        img.onerror = () => resolve([]);
+        img.src = url;
+      });
+    }
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function attachEvents() {
+      document.getElementById('data-input').addEventListener('change', event => {
+        const file = event.target.files[0];
+        if (!file) return;
+        handleDataFile(file);
+      });
+
+      ['filter-date-start', 'filter-date-end'].forEach(id => {
+        document.getElementById(id).addEventListener('change', debounce(applyFilters, 200));
+      });
+      document.getElementById('filter-partenaires').addEventListener('change', debounce(applyFilters, 200));
+      document.getElementById('filter-offres').addEventListener('change', debounce(applyFilters, 200));
+
+      document.getElementById('reset-filters').addEventListener('click', () => {
+        populateFilters();
+        applyFilters();
+      });
+
+      document.getElementById('export-table').addEventListener('click', exportTableCsv);
+      document.querySelectorAll('.export-chart').forEach(btn => {
+        btn.addEventListener('click', () => exportChart(btn.dataset.chart));
+      });
+
+      document.getElementById('table-prev').addEventListener('click', () => {
+        state.tablePage = Math.max(0, state.tablePage - 1);
+        renderTables();
+      });
+      document.getElementById('table-next').addEventListener('click', () => {
+        const maxPage = Math.floor((state.filtered.length - 1) / state.tablePageSize);
+        state.tablePage = Math.min(maxPage, state.tablePage + 1);
+        renderTables();
+      });
+
+      document.querySelectorAll('#table-details thead th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (state.tableSort.key === key) {
+            state.tableSort.direction = state.tableSort.direction === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.tableSort.key = key;
+            state.tableSort.direction = 'desc';
+          }
+          renderTables();
+        });
+      });
+
+      document.getElementById('charte-input').addEventListener('change', event => handleCharte(event.target.files));
+
+      document.getElementById('visual-hero').addEventListener('change', event => {
+        state.assignments.hero = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-watermark').addEventListener('change', event => {
+        state.assignments.watermark = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-empty').addEventListener('change', event => {
+        state.assignments.empty = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-section').addEventListener('change', event => {
+        state.assignments.section = event.target.value || null;
+        updateAssignments();
+      });
+
+      document.getElementById('top-offres-more').addEventListener('click', () => {
+        state.topOfferLimit += 20;
+        renderCharts();
+      });
+      document.getElementById('top-offres-all').addEventListener('click', () => {
+        state.topOfferLimit = 1_000;
+        renderCharts();
+      });
+      document.getElementById('top-offres-search').addEventListener('input', event => {
+        state.topOfferSearch = event.target.value;
+        state.topOfferLimit = 0;
+        renderCharts();
+      });
+
+      document.querySelectorAll('input[name="time-aggregation"]').forEach(input => {
+        input.addEventListener('change', () => {
+          state.manualAggregation = input.value;
+          state.aggregation = input.value;
+          renderCharts();
+          renderTables();
+        });
+      });
+
+      document.addEventListener('dragenter', event => {
+        event.preventDefault();
+        dragCounter++;
+        document.body.classList.add('dragging');
+      });
+      document.addEventListener('dragover', event => {
+        event.preventDefault();
+      });
+      document.addEventListener('dragleave', event => {
+        event.preventDefault();
+        dragCounter = Math.max(0, dragCounter - 1);
+        if (dragCounter === 0) {
+          document.body.classList.remove('dragging');
+        }
+      });
+      document.addEventListener('drop', event => {
+        event.preventDefault();
+        dragCounter = 0;
+        document.body.classList.remove('dragging');
+        const files = event.dataTransfer?.files;
+        if (files && files.length) {
+          const file = files[0];
+          if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+            handleCharte(files);
+          } else {
+            handleDataFile(file);
+          }
+        }
+      });
+
+      const ro = new ResizeObserver(debounce(() => {
+        refreshCharts();
+      }, 250));
+      document.querySelectorAll('.chart-wrapper').forEach(wrapper => ro.observe(wrapper));
+    }
+
+    function init() {
+      attachEvents();
+      renderPalettePreview();
+      updateAssignments();
+      loadDefaultWorkbook();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
