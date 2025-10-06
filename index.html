@@ -3,1547 +3,1236 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>scans2025 Dashboard</title>
+  <title>Dashboard Pass Jeunes</title>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          colors: {
-            "pass-jeunes-blue": "#1C2C5B",
-            "pass-jeunes-green": "#3CB371",
-            "pass-jeunes-yellow": "#F5C842",
-            "pass-jeunes-pink": "#F57EA8",
-            "pass-jeunes-purple": "#6C5CE7"
+          fontFamily: {
+            display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
           }
         }
       }
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/customParseFormat.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-3nV8vLwawx2UY8ailqXFz3vGN9VOGBev5nYeD1yfknhk+aoCA8DmF5asJ5AZt0pOEtpJR/YWZLxE+nobBOU9AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.2/color-thief.umd.js"></script>
+  <script>if (window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js';}</script>
   <style>
-    ::selection { background: rgba(28,44,91,0.2); }
-    .scrollbar-thin { scrollbar-width: thin; }
-    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
-    .scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(28,44,91,0.4); border-radius: 999px; }
-    .chip { display: inline-flex; align-items: center; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background-color: #f1f5f9; color: #475569; }
+    :root {
+      --pj-blue:#1C2C5B;
+      --pj-green:#3CB371;
+      --pj-yellow:#F5C842;
+      --pj-neutral:#F3F4F6;
+      --pj-text:#0F172A;
+    }
+    body { font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
+    .hero-visual {
+      background-size: cover;
+      background-position: center;
+      min-height: 180px;
+      border-radius: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, rgba(28,44,91,0.82), rgba(28,44,91,0.55));
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+    }
+    .kpi-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.08;
+      background-size: 160%;
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;
+    }
+    .section-badge img {
+      width: 28px;
+      height: 28px;
+      object-fit: cover;
+      border-radius: 0.75rem;
+    }
+    .empty-state {
+      border: 2px dashed rgba(15,23,42,0.08);
+      border-radius: 1rem;
+      padding: 3rem 1.5rem;
+      text-align: center;
+      background: rgba(243,244,246,0.7);
+    }
+    .table-container {
+      max-height: 480px;
+      overflow: auto;
+    }
+    .gallery-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+    .gallery-item {
+      border-radius: 1rem;
+      border: 2px solid transparent;
+      overflow: hidden;
+      background: white;
+      box-shadow: 0 10px 30px -18px rgba(0,0,0,0.4);
+    }
+    .gallery-item[data-selected="true"] {
+      border-color: var(--pj-green);
+    }
+    .chart-wrapper {
+      position: relative;
+      min-height: 280px;
+    }
+    .chart-scroll {
+      max-height: 720px;
+      overflow-y: auto;
+    }
+    body.dragging::after {
+      content: 'Déposez votre fichier ici';
+      position: fixed;
+      inset: 0;
+      background: rgba(28,44,91,0.65);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      z-index: 9999;
+      pointer-events: none;
+    }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-900 min-h-screen">
-  <header class="bg-white shadow sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <h1 class="text-2xl font-bold tracking-tight text-pass-jeunes-blue">scans2025</h1>
-      <div class="flex items-center space-x-3 text-sm text-slate-600">
-        <a id="open-chrome-guide" href="#" class="inline-flex items-center space-x-2 text-pass-jeunes-blue hover:text-pass-jeunes-green font-medium">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 102 0v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-          </svg>
-          <span>Ouvrir dans Chrome ?</span>
-        </a>
-        <span class="hidden sm:block">Tableau de bord Pass Jeunes</span>
-        <span class="inline-flex items-center px-3 py-1 rounded-full bg-pass-jeunes-blue text-white text-xs uppercase tracking-wide">Client-side only</span>
+<body class="bg-[color:var(--pj-neutral)] text-[color:var(--pj-text)] min-h-screen">
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm uppercase tracking-[0.3em] text-slate-400">Pass Jeunes</p>
+        <h1 class="text-2xl font-bold text-[color:var(--pj-blue)]">Dashboard scans2025</h1>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[color:var(--pj-blue)] text-white font-medium cursor-pointer">
+          <input id="charte-input" type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" />
+          <span>Importer la charte (PDF/Images)</span>
+        </label>
+        <label class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] font-medium cursor-pointer">
+          <input id="data-input" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <span>Importer un fichier (Excel / CSV)</span>
+        </label>
+        <button id="reset-filters" class="px-4 py-2 rounded-full bg-[color:var(--pj-yellow)] text-[color:var(--pj-text)] font-semibold">Réinitialiser filtres</button>
       </div>
     </div>
   </header>
-  <div class="flex">
-    <aside class="w-full max-w-xs bg-white shadow-lg min-h-screen p-6 space-y-8">
-      <div>
-        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2">Importer des données</h2>
-        <p class="text-sm text-slate-500 mb-3">Chargez un fichier CSV ou Excel conforme à <em>scans2025.xlsx</em>.</p>
-        <div class="space-y-3">
-          <input id="file-input" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
-          <button id="import-btn" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-pass-jeunes-blue text-white font-semibold hover:bg-opacity-90 transition">Importer une base (CSV/Excel)</button>
-          <p id="import-status" class="text-xs text-slate-500"></p>
+
+  <div class="max-w-7xl mx-auto px-6 py-8 grid gap-8 lg:grid-cols-[320px_1fr]">
+    <aside class="bg-white rounded-3xl shadow-lg p-6 space-y-8 self-start sticky top-6">
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Chargement des données</h2>
+        <div class="rounded-2xl border border-slate-200 p-4 bg-slate-50/60 text-sm space-y-3">
+          <p>Déposez un fichier <strong>scans2025.xlsx</strong> ou un CSV avec les colonnes attendues.</p>
+          <p class="text-xs text-slate-500">Colonnes : Le partenaire, L'offre, Date de scan, Valeur de l'offre.</p>
+          <div id="load-status" class="text-xs text-slate-600"></div>
         </div>
-      </div>
-      <div>
-        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2 flex items-center justify-between">Filtres
-          <button id="reset-filters" class="text-xs text-pass-jeunes-blue hover:underline">Réinitialiser</button>
-        </h2>
-        <div class="space-y-4" id="filters-form">
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Filtres</h2>
+        <div class="space-y-5 text-sm">
           <div>
-            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Plage de dates</label>
-            <div class="flex space-x-2">
-              <input type="date" id="filter-date-start" class="w-1/2 rounded-md border-slate-300" />
-              <input type="date" id="filter-date-end" class="w-1/2 rounded-md border-slate-300" />
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Période</label>
+            <div class="flex gap-2">
+              <input type="date" id="filter-date-start" class="w-1/2 rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)]" />
+              <input type="date" id="filter-date-end" class="w-1/2 rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)]" />
             </div>
           </div>
           <div>
             <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Partenaires</label>
-            <select id="filter-partenaire" class="w-full rounded-md border-slate-300" multiple></select>
+            <select id="filter-partenaires" multiple class="w-full rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)] h-32"></select>
           </div>
           <div>
             <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Offres</label>
-            <select id="filter-offre" class="w-full rounded-md border-slate-300" multiple></select>
-          </div>
-          <div>
-            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">États Pass</label>
-            <select id="filter-etat" class="w-full rounded-md border-slate-300" multiple></select>
-          </div>
-          <div>
-            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Régions</label>
-            <select id="filter-region" class="w-full rounded-md border-slate-300" multiple></select>
-          </div>
-          <div>
-            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Catégories</label>
-            <select id="filter-categorie" class="w-full rounded-md border-slate-300" multiple></select>
-          </div>
-        </div>
-      </div>
-      <div>
-        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2">Palette Pass Jeunes (y)</h2>
-        <p class="text-xs text-slate-500 mb-2">Collez les codes HEX séparés par des virgules à partir de l'identité visuelle Pass Jeunes.</p>
-        <textarea id="palette-input" class="w-full h-24 rounded-md border-slate-300 text-xs p-2" placeholder="#1C2C5B,#3CB371,#F5C842,#F57EA8,#6C5CE7"></textarea>
-        <button id="apply-palette" class="mt-2 w-full inline-flex items-center justify-center px-3 py-2 rounded-md border border-pass-jeunes-blue text-pass-jeunes-blue text-sm font-semibold hover:bg-pass-jeunes-blue hover:text-white transition">Appliquer la palette</button>
-        <p id="palette-status" class="text-xs text-slate-500 mt-2"></p>
-      </div>
-      <div class="space-y-2">
-        <button id="export-csv" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-green text-white font-semibold hover:bg-opacity-90">Exporter données filtrées (CSV)</button>
-        <button id="export-charts" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-yellow text-slate-900 font-semibold hover:bg-opacity-90">Exporter chaque graphique (PNG)</button>
-        <button id="export-pdf" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-pink text-white font-semibold hover:bg-opacity-90">Exporter mini-rapport (PDF)</button>
-      </div>
-    </aside>
-    <main class="flex-1 p-6 space-y-8">
-      <section>
-        <h2 class="text-xl font-semibold text-pass-jeunes-blue mb-4">Indicateurs clés</h2>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="kpi-container">
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Nombre total de scans</h3>
-            <p id="kpi-total-scans" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
-          </div>
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Offres distinctes</h3>
-            <p id="kpi-offres" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
-          </div>
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Partenaires distincts</h3>
-            <p id="kpi-partenaires" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
-          </div>
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Répartition par État Pass</h3>
-            <div id="kpi-etat" class="flex flex-wrap gap-2 mt-2"></div>
-          </div>
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Croissance MoM des scans</h3>
-            <p id="kpi-mom" class="text-2xl font-semibold mt-2">-</p>
-          </div>
-          <div class="kpi-card bg-white rounded-xl shadow p-4">
-            <h3 class="text-xs uppercase tracking-wide text-slate-500">Valeur totale & moyenne</h3>
-            <p id="kpi-valeurs" class="text-2xl font-semibold mt-2">-</p>
+            <select id="filter-offres" multiple class="w-full rounded-xl border-slate-200 focus:border-[color:var(--pj-blue)] h-32"></select>
           </div>
         </div>
       </section>
-      <section class="space-y-6">
-        <div class="bg-white rounded-xl shadow p-4">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-pass-jeunes-blue">Tendance des scans par mois</h3>
-          </div>
-          <canvas id="chart-trend" height="120"></canvas>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Palette détectée</h2>
+        <div id="palette-preview" class="flex gap-2"></div>
+        <p class="text-xs text-slate-500 mt-2">Les couleurs sont automatiquement appliquées aux graphiques et composants.</p>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold text-[color:var(--pj-blue)] mb-3">Visuels importés</h2>
+        <div id="visual-gallery" class="gallery-grid text-xs text-slate-500"></div>
+        <div class="space-y-2 text-sm">
+          <label class="flex items-center gap-2"><select id="visual-hero" class="flex-1 rounded-xl border-slate-200"></select><span>Header</span></label>
+          <label class="flex items-center gap-2"><select id="visual-watermark" class="flex-1 rounded-xl border-slate-200"></select><span>KPI</span></label>
+          <label class="flex items-center gap-2"><select id="visual-empty" class="flex-1 rounded-xl border-slate-200"></select><span>Empty state</span></label>
+          <label class="flex items-center gap-2"><select id="visual-section" class="flex-1 rounded-xl border-slate-200"></select><span>Sections</span></label>
         </div>
-        <div class="grid gap-6 lg:grid-cols-2">
-          <div class="bg-white rounded-xl shadow p-4">
+      </section>
+    </aside>
+
+    <main class="space-y-8">
+      <section class="hero-visual" id="hero-visual">
+        <div class="hero-content p-10 text-white space-y-4">
+          <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs uppercase tracking-[0.2em]">Smart analyse Pass Jeunes</div>
+          <h2 class="text-3xl font-semibold">Analyse dynamique des scans</h2>
+          <p class="max-w-xl text-white/80">Importez vos données, sélectionnez la période et laissez la plateforme adapter automatiquement les indicateurs, graphiques et mises en valeur.</p>
+        </div>
+      </section>
+
+      <section>
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" id="kpi-container">
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Total scans</p>
+            <p id="kpi-scans" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Montant total consommé</p>
+            <p id="kpi-amount" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Offres distinctes</p>
+            <p id="kpi-offres" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+          <article class="kpi-card bg-white rounded-3xl shadow-md p-6">
+            <p class="text-xs uppercase tracking-wide text-slate-500">Partenaires distincts</p>
+            <p id="kpi-partenaires" class="text-3xl font-bold text-[color:var(--pj-blue)]">-</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="space-y-6" id="charts-section" data-visual-slot="sections">
+        <header class="flex items-center justify-between">
+          <div class="flex items-center gap-3 section-badge">
+            <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+              <img id="section-visual-img" alt="" />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Visualisations clés</h3>
+              <p class="text-sm text-slate-500">Adaptation automatique selon le volume et la période analysée.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="inline-flex items-center gap-1"><input type="radio" name="time-aggregation" value="month" checked /> <span>Mois</span></label>
+            <label class="inline-flex items-center gap-1"><input type="radio" name="time-aggregation" value="quarter" /> <span>Trimestre</span></label>
+          </div>
+        </header>
+        <div class="space-y-6">
+          <article class="bg-white rounded-3xl shadow-md p-6">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold text-pass-jeunes-blue">Top 10 offres scannées</h3>
-              <div class="flex items-center space-x-2 text-xs bg-slate-100 rounded-full px-2 py-1">
-                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="current">Mois courant</button>
-                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="global">Global</button>
-                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="filtered">Période filtrée</button>
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Consommation par offre</h4>
+              <div class="flex items-center flex-wrap gap-2 text-xs justify-end">
+                <span id="top-offres-caption" class="px-3 py-1 rounded-full bg-[color:var(--pj-neutral)] text-[color:var(--pj-blue)]"></span>
+                <button id="top-offres-more" class="hidden px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Voir +</button>
+                <button id="top-offres-all" class="hidden px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Afficher tout</button>
+                <input id="top-offres-search" class="hidden rounded-full border border-slate-200 px-3 py-1" placeholder="Rechercher" />
+                <button data-chart="chart-offres" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)]">Exporter PNG</button>
               </div>
             </div>
-            <canvas id="chart-top-offres" height="200"></canvas>
-          </div>
-          <div class="bg-white rounded-xl shadow p-4">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-semibold text-pass-jeunes-blue">Top 10 partenaires</h3>
+            <div class="chart-scroll">
+              <div class="chart-wrapper">
+                <canvas id="chart-offres"></canvas>
+              </div>
             </div>
-            <canvas id="chart-top-partenaires" height="200"></canvas>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl shadow p-4">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-pass-jeunes-blue">Scans par État Pass</h3>
-          </div>
-          <canvas id="chart-etat" height="160"></canvas>
+          </article>
+          <article class="bg-white rounded-3xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Tendance mensuelle des montants</h4>
+              <button data-chart="chart-montants" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter PNG</button>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-montants"></canvas>
+            </div>
+          </article>
+          <article class="bg-white rounded-3xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-base font-semibold text-[color:var(--pj-blue)]">Évolution du nombre de scans</h4>
+              <button data-chart="chart-scans" class="export-chart px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter PNG</button>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-scans"></canvas>
+            </div>
+          </article>
         </div>
       </section>
-      <section class="bg-white rounded-xl shadow p-4">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+
+      <section class="bg-white rounded-3xl shadow-md p-6" data-visual-slot="sections">
+        <header class="flex items-center gap-3 mb-4 section-badge">
+          <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+            <img alt="" />
+          </div>
           <div>
-            <h3 class="text-lg font-semibold text-pass-jeunes-blue">Analyse intelligente</h3>
-            <p id="smart-subtitle" class="text-xs text-slate-500 mt-1">Sélectionnez une période et une dimension pour explorer les segments clés.</p>
+            <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Top offres par mois</h3>
+            <p class="text-sm text-slate-500">Montants et volume des trois meilleures offres.</p>
           </div>
-          <div class="flex flex-wrap items-center gap-3 text-sm">
-            <label for="smart-period" class="text-xs uppercase tracking-wide text-slate-500">Période</label>
-            <select id="smart-period" class="rounded-md border-slate-300 text-sm">
-              <option value="month">Mois</option>
-              <option value="quarter">Trimestre</option>
-              <option value="year">Année</option>
-            </select>
-            <label for="smart-dimension" class="text-xs uppercase tracking-wide text-slate-500">Dimension</label>
-            <select id="smart-dimension" class="rounded-md border-slate-300 text-sm">
-              <option value="offre">Offre</option>
-              <option value="partenaire">Partenaire</option>
-              <option value="region">Région</option>
-              <option value="categorie">Catégorie</option>
-            </select>
-          </div>
-        </div>
-        <div class="overflow-auto scrollbar-thin" style="max-height: 360px;">
-          <table class="min-w-full text-sm" id="smart-analysis-table">
-            <thead class="bg-slate-50 text-slate-600 uppercase text-xs">
+        </header>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500 uppercase text-xs">
               <tr>
-                <th class="px-4 py-3 text-left">Segment</th>
-                <th class="px-4 py-3 text-right" id="smart-header-current">Scans</th>
-                <th class="px-4 py-3 text-right">Var. scans</th>
-                <th class="px-4 py-3 text-right">Valeur totale</th>
-                <th class="px-4 py-3 text-right">Var. valeur</th>
-                <th class="px-4 py-3 text-right">Valeur moyenne</th>
+                <th class="py-2 pr-4">Mois</th>
+                <th class="py-2 pr-4">Top offres (montant)</th>
+                <th class="py-2 pr-4">Top offres (# scans)</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100" id="smart-analysis-body"></tbody>
+            <tbody id="table-top-offres" class="divide-y divide-slate-100"></tbody>
           </table>
         </div>
       </section>
-      <section class="bg-white rounded-xl shadow p-4">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-pass-jeunes-blue">Détail des scans</h3>
-          <span id="table-count" class="text-xs text-slate-500"></span>
-        </div>
-        <div class="overflow-auto scrollbar-thin" style="max-height: 420px;">
-          <table class="min-w-full text-sm" id="data-table">
-            <thead class="bg-slate-50 text-slate-600 uppercase text-xs">
+
+      <section class="bg-white rounded-3xl shadow-md p-6" data-visual-slot="sections">
+        <header class="flex items-center justify-between mb-4 section-badge">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-white shadow flex items-center justify-center overflow-hidden">
+              <img alt="" />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-[color:var(--pj-blue)]">Table détaillée</h3>
+              <p class="text-sm text-slate-500">Filtrable, triable, exportable en CSV.</p>
+            </div>
+          </div>
+          <button id="export-table" class="px-3 py-1 rounded-full border border-[color:var(--pj-blue)] text-[color:var(--pj-blue)] text-xs">Exporter CSV</button>
+        </header>
+        <div class="table-container">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500 uppercase text-xs">
               <tr>
-                <th class="px-4 py-3 text-left">Date</th>
-                <th class="px-4 py-3 text-left">Partenaire</th>
-                <th class="px-4 py-3 text-left">Offre</th>
-                <th class="px-4 py-3 text-left">État Pass</th>
-                <th class="px-4 py-3 text-left">Région</th>
-                <th class="px-4 py-3 text-left">Catégorie</th>
-                <th class="px-4 py-3 text-right">Valeur</th>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="date">Date</th>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="partenaire">Partenaire</th>
+                <th class="py-2 pr-4 cursor-pointer" data-sort="offre">Offre</th>
+                <th class="py-2 pr-4 text-right cursor-pointer" data-sort="montant">Valeur</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100" id="table-body"></tbody>
+            <tbody id="table-details" class="divide-y divide-slate-100"></tbody>
           </table>
+        </div>
+        <div class="flex items-center justify-between mt-4 text-sm">
+          <span id="table-pagination-info" class="text-slate-500"></span>
+          <div class="space-x-2">
+            <button id="table-prev" class="px-3 py-1 rounded-full border border-slate-200">Précédent</button>
+            <button id="table-next" class="px-3 py-1 rounded-full border border-slate-200">Suivant</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="empty-state" class="hidden empty-state">
+        <div class="flex flex-col items-center gap-4">
+          <img id="empty-state-img" class="w-48 h-48 object-contain" alt="" />
+          <div>
+            <h3 class="text-xl font-semibold text-[color:var(--pj-blue)]">Aucune donnée pour ces filtres</h3>
+            <p class="text-sm text-slate-500">Modifiez la période, les partenaires ou les offres pour retrouver des résultats.</p>
+          </div>
         </div>
       </section>
     </main>
   </div>
-  <div id="mapping-modal" class="fixed inset-0 bg-slate-900 bg-opacity-60 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full space-y-4">
-      <div>
-        <h3 class="text-lg font-semibold text-pass-jeunes-blue">Associer les colonnes</h3>
-        <p class="text-sm text-slate-500">Certaines colonnes n'ont pas été reconnues. Associez-les manuellement.</p>
-      </div>
-      <form id="mapping-form" class="space-y-4"></form>
-      <div class="flex items-center justify-end space-x-3">
-        <button id="mapping-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-600">Annuler</button>
-        <button id="mapping-apply" class="px-4 py-2 rounded-md bg-pass-jeunes-blue text-white font-semibold">Valider</button>
-      </div>
-    </div>
-  </div>
 
   <script>
+    const numberFormatter = new Intl.NumberFormat('fr-MA');
+    const currencyFormatter = new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD', maximumFractionDigits: 2 });
+
     const state = {
-      originalRows: [],
-      rawData: [],
-      filteredData: [],
-      uniqueValues: { partenaire: [], offre: [], etat_pass: [], region: [], categorie: [] },
-      filters: { dateStart: '', dateEnd: '', partenaire: [], offre: [], etat_pass: [], region: [], categorie: [] },
-      palette: [],
+      rows: [],
+      filtered: [],
+      palette: ['#1C2C5B', '#3CB371', '#F5C842', '#FF8F6B', '#4C4CE6'],
+      visuals: [],
+      assignments: { hero: null, watermark: null, empty: null, section: null },
       charts: {},
-      debounceTimer: null,
-      lastHeaders: [],
-      mappingRequired: false,
-      topOffresMode: 'filtered',
-      smart: { period: 'month', dimension: 'offre' },
-      smartAnalysis: null
+      topOfferLimit: 0,
+      topOfferSearch: '',
+      tablePage: 0,
+      tablePageSize: 20,
+      tableSort: { key: 'date', direction: 'desc' },
+      aggregation: 'month',
+      manualAggregation: null
     };
 
-    const defaultPalette = ['#1C2C5B', '#3CB371', '#F5C842', '#F57EA8', '#6C5CE7', '#00A6FB', '#FF8966', '#FFD166'];
-    const COLUMN_SYNONYMS = {
-      partenaire: ['partenaire', 'le partenaire', 'partner', 'partenaire_nom', 'partenaire_name', 'nom partenaire'],
-      offre: ['offre', "l'offre", 'offer', 'libelle_offre', 'libellé offre'],
-      etat_pass: ['etat pass', 'etat', 'etat_pass', 'statut_pass', 'statut', 'etat du pass'],
-      date_scan: ['date_scan', 'date de scan', 'date', 'scan_date', 'date_scann', 'date scan'],
-      valeur_offre: ['valeur_offre', "valeur de l'offre", 'valeur', 'amount', 'montant', 'valeur offre'],
-      region: ['region', 'région', 'zone', 'area', 'territoire', 'region_nom'],
-      categorie: ['categorie', 'catégorie', 'category', 'famille_offre', 'segment']
-    };
+    let dragCounter = 0;
 
-    const DIMENSION_LABELS = {
-      offre: 'offres',
-      partenaire: 'partenaires',
-      region: 'régions',
-      categorie: 'catégories'
-    };
-
-    const PERIOD_LABELS = {
-      month: 'mois',
-      quarter: 'trimestre',
-      year: 'année'
-    };
-
-    dayjs.extend(window.dayjs_plugin_customParseFormat);
-
-    function loadInitialPreferences() {
-      try {
-        const savedPalette = localStorage.getItem('passjeunes_palette');
-        if (savedPalette) {
-          state.palette = savedPalette.split(',').map((c) => c.trim()).filter(Boolean);
-          document.getElementById('palette-input').value = savedPalette;
-        }
-        const savedFilters = localStorage.getItem('passjeunes_filters');
-        if (savedFilters) {
-          const parsed = JSON.parse(savedFilters);
-          state.filters = {
-            ...state.filters,
-            ...parsed,
-            partenaire: parsed.partenaire || [],
-            offre: parsed.offre || [],
-            etat_pass: parsed.etat_pass || [],
-            region: parsed.region || [],
-            categorie: parsed.categorie || []
-          };
-          document.getElementById('filter-date-start').value = parsed.dateStart || '';
-          document.getElementById('filter-date-end').value = parsed.dateEnd || '';
-        }
-        const savedSmart = localStorage.getItem('passjeunes_smart');
-        if (savedSmart) {
-          const parsedSmart = JSON.parse(savedSmart);
-          state.smart = {
-            period: parsedSmart.period || 'month',
-            dimension: parsedSmart.dimension || 'offre'
-          };
-          document.getElementById('smart-period').value = state.smart.period;
-          document.getElementById('smart-dimension').value = state.smart.dimension;
-        }
-      } catch (error) {
-        console.warn('Préférences non chargées', error);
-      }
-      if (!state.palette.length) {
-        state.palette = [...defaultPalette];
-      }
-      document.getElementById('smart-period').value = state.smart.period;
-      document.getElementById('smart-dimension').value = state.smart.dimension;
-    }
-
-    function loadFile(file) {
-      if (!file) return;
-      document.getElementById('import-status').textContent = 'Lecture du fichier en cours…';
-      parseCsvXlsx(file)
-        .then((rows) => {
-          if (!rows.length) {
-            throw new Error('Le fichier est vide.');
-          }
-          state.originalRows = rows;
-          state.lastHeaders = Object.keys(rows[0] || {});
-          const { success, data, reason } = normalizeColumns(rows);
-          if (success) {
-            state.mappingRequired = false;
-            document.getElementById('mapping-modal').classList.add('hidden');
-            hydrateDataset(data);
-            document.getElementById('import-status').textContent = `${rows.length} lignes importées.`;
-          } else {
-            state.mappingRequired = true;
-            showMappingForm(reason || 'Colonnes non reconnues.', state.lastHeaders);
-            document.getElementById('import-status').textContent = 'Colonnes à associer manuellement.';
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-          document.getElementById('import-status').textContent = `Erreur: ${error.message}`;
-        });
-    }
-
-    function parseCsvXlsx(file) {
-      const extension = file.name.split('.').pop().toLowerCase();
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Impossible de lire le fichier.'));
-        if (extension === 'csv') {
-          reader.onload = () => {
-            const text = reader.result;
-            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-            if (parsed.errors.length) {
-              console.warn(parsed.errors);
-            }
-            resolve(parsed.data);
-          };
-          reader.readAsText(file, 'utf-8');
-        } else if (extension === 'xlsx' || extension === 'xls') {
-          reader.onload = () => {
-            try {
-              const data = new Uint8Array(reader.result);
-              const workbook = XLSX.read(data, { type: 'array' });
-              const firstSheet = workbook.SheetNames[0];
-              const worksheet = workbook.Sheets[firstSheet];
-              const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-              resolve(json);
-            } catch (err) {
-              reject(new Error('Impossible de parser le fichier Excel.'));
-            }
-          };
-          reader.readAsArrayBuffer(file);
-        } else {
-          reject(new Error('Format de fichier non supporté.'));
-        }
-      });
-    }
-
-    function normalizeHeader(header) {
-      return String(header || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/(^_|_$)/g, '')
-        .replace(/__+/g, '_');
-    }
-
-    function normalizeColumns(rows, manualMap = null) {
-      if (!rows || !rows.length) return { success: false, reason: 'Aucune donnée.' };
-      const expected = ['partenaire', 'offre', 'etat_pass', 'date_scan'];
-      const optional = ['valeur_offre', 'region', 'categorie'];
-      const mapping = {};
-      const headers = Object.keys(rows[0]);
-      const headerNormalized = headers.map((h) => normalizeHeader(h));
-      expected.concat(optional).forEach((key) => {
-        mapping[key] = null;
-      });
-
-      const assignFromSynonyms = (targetKey) => {
-        const syns = COLUMN_SYNONYMS[targetKey] || [];
-        for (let i = 0; i < headerNormalized.length; i++) {
-          if (syns.includes(headerNormalized[i])) {
-            mapping[targetKey] = headers[i];
-            break;
-          }
-        }
+    const debounce = (fn, delay = 200) => {
+      let t;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), delay);
       };
+    };
 
-      expected.forEach(assignFromSynonyms);
-      optional.forEach(assignFromSynonyms);
+    const lightenColor = (hex, amt = -20) => {
+      let usePound = false;
+      let color = hex;
+      if (color[0] === '#') { color = color.slice(1); usePound = true; }
+      if (color.length === 3) { color = color.split('').map(c => c + c).join(''); }
+      const num = parseInt(color, 16);
+      let r = (num >> 16) + amt;
+      let g = ((num >> 8) & 0x00FF) + amt;
+      let b = (num & 0x0000FF) + amt;
+      r = Math.max(Math.min(255, r), 0);
+      g = Math.max(Math.min(255, g), 0);
+      b = Math.max(Math.min(255, b), 0);
+      return (usePound ? '#' : '') + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    };
 
-      if (manualMap) {
-        Object.keys(manualMap).forEach((key) => {
-          if (manualMap[key]) {
-            mapping[key] = manualMap[key];
-          }
-        });
+    function updateRootPalette(colors) {
+      if (!colors || !colors.length) return;
+      state.palette = colors.map(c => c.startsWith('#') ? c : `#${c}`);
+      const root = document.documentElement;
+      const [blue, green, yellow, neutral, text] = [
+        state.palette[0] || '#1C2C5B',
+        state.palette[1] || '#3CB371',
+        state.palette[2] || '#F5C842',
+        state.palette[3] || '#F3F4F6',
+        state.palette[4] || '#0F172A'
+      ];
+      root.style.setProperty('--pj-blue', blue);
+      root.style.setProperty('--pj-green', green);
+      root.style.setProperty('--pj-yellow', yellow);
+      root.style.setProperty('--pj-neutral', neutral);
+      root.style.setProperty('--pj-text', text);
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.style.setProperty('--watermark', state.assignments.watermark || '');
+        card.style.setProperty('color', 'var(--pj-text)');
+      });
+      renderPalettePreview();
+      updateAssignments();
+      refreshCharts();
+    }
+
+    function renderPalettePreview() {
+      const container = document.getElementById('palette-preview');
+      container.innerHTML = '';
+      state.palette.forEach((color, idx) => {
+        const swatch = document.createElement('div');
+        swatch.className = 'w-10 h-10 rounded-2xl shadow-inner flex flex-col justify-center items-center text-[10px] text-white/90';
+        swatch.style.backgroundColor = color;
+        swatch.innerHTML = `<span>${idx + 1}</span>`;
+        container.appendChild(swatch);
+      });
+    }
+
+    function formatShortNumber(value) {
+      if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)} Md`;
+      if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)} M`;
+      if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)} k`;
+      return numberFormatter.format(value);
+    }
+
+    function normalizeRow(row) {
+      const mapping = {
+        'le partenaire': 'partenaire',
+        'partenaire': 'partenaire',
+        "l'offre": 'offre',
+        'offre': 'offre',
+        'date de scan': 'date_scan',
+        'date_scan': 'date_scan',
+        'date': 'date_scan',
+        "valeur de l'offre": 'valeur',
+        'valeur': 'valeur',
+        'montant': 'valeur'
+      };
+      const normalized = { partenaire: '', offre: '', date_scan: '', valeur: null };
+      Object.keys(row).forEach(key => {
+        const clean = key.trim().toLowerCase();
+        const mapped = mapping[clean];
+        if (mapped) normalized[mapped] = row[key];
+      });
+      return normalized;
+    }
+
+    function parseValue(raw) {
+      if (raw === null || raw === undefined) return 0;
+      if (typeof raw === 'number') return raw;
+      const sanitized = String(raw).replace(/[^0-9,.-]/g, '').replace(',', '.');
+      const parsed = parseFloat(sanitized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function parseDate(raw) {
+      if (!raw) return null;
+      if (raw instanceof Date && !isNaN(raw)) return raw;
+      const text = String(raw).trim();
+      const [d1, d2] = text.split(' ');
+      const candidate = d2 ? `${d1} ${d2}` : text;
+      let date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) {
+        date = new Date(candidate);
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(candidate)) {
+        const [dd, mm, yyyy] = candidate.split('/').map(Number);
+        date = new Date(yyyy, mm - 1, dd);
+      } else if (!Number.isNaN(Number(candidate))) {
+        date = XLSX.SSF.parse_date_code(Number(candidate));
+        if (date) date = new Date(date.y, date.m - 1, date.d);
+      } else {
+        date = new Date(candidate);
       }
+      return date && !isNaN(date) ? date : null;
+    }
 
-      const missing = expected.filter((key) => !mapping[key]);
-      if (missing.length) {
-        return { success: false, reason: missing };
-      }
-
-      const normalizedRows = rows.map((row) => {
-        const partenaire = String(row[mapping.partenaire] || '').trim();
-        const offre = String(row[mapping.offre] || '').trim();
-        const etat_pass = String(row[mapping.etat_pass] || '').trim();
-        const dateRaw = row[mapping.date_scan];
-        const valeurRaw = mapping.valeur_offre ? row[mapping.valeur_offre] : '';
-        const region = mapping.region ? String(row[mapping.region] || '').trim() : '';
-        const categorie = mapping.categorie ? String(row[mapping.categorie] || '').trim() : '';
-        const parsedDate = parseDate(dateRaw);
+    function computeDerived(rows) {
+      return rows.map(row => {
+        const date = parseDate(row.date_scan);
+        const valeur = parseValue(row.valeur);
+        const mois = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` : null;
+        const trimestre = date ? `${date.getFullYear()}-T${Math.floor(date.getMonth() / 3) + 1}` : null;
         return {
-          partenaire,
-          offre,
-          etat_pass,
-          date_scan: parsedDate ? parsedDate.toISOString() : null,
-          valeur_offre: parseNumeric(valeurRaw),
-          region,
-          categorie,
-          _date_display: parsedDate ? parsedDate : null,
-          _date_raw: dateRaw
+          partenaire: (row.partenaire || '').toString().trim(),
+          offre: (row.offre || '').toString().trim(),
+          date,
+          valeur,
+          mois,
+          trimestre
         };
-      }).filter((r) => r.partenaire || r.offre || r.etat_pass || r.date_scan);
-
-      return { success: true, data: normalizedRows };
+      }).filter(r => r.partenaire && r.offre && r.date);
     }
 
-    function parseDate(value) {
-      if (!value) return null;
-      if (value instanceof Date) {
-        return dayjs(value);
+    async function loadDefaultWorkbook() {
+      try {
+        const response = await fetch('scans2025.xlsx');
+        if (!response.ok) throw new Error('Fichier non disponible');
+        const arrayBuffer = await response.arrayBuffer();
+        handleWorkbook(arrayBuffer, 'scans2025.xlsx');
+        document.getElementById('load-status').textContent = 'scans2025.xlsx chargé automatiquement.';
+      } catch (error) {
+        document.getElementById('load-status').textContent = 'Importez votre fichier pour commencer.';
       }
-      const str = String(value).trim();
-      if (!str) return null;
-      const formats = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYY/MM/DD', 'DD.MM.YYYY', 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DD HH:mm:ss', 'D MMM YYYY', 'MMM D YYYY', 'D/M/YYYY', 'M/D/YYYY'];
-      for (const fmt of formats) {
-        const parsed = dayjs(str, fmt, true);
-        if (parsed.isValid()) {
-          return parsed;
-        }
+    }
+
+    function handleWorkbook(buffer, filename) {
+      try {
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const sheetName = workbook.SheetNames.includes('Worksheet') ? 'Worksheet' : workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+        const normalized = rows.map(normalizeRow);
+        state.rows = computeDerived(normalized);
+        state.manualAggregation = null;
+        state.tablePage = 0;
+        populateFilters();
+        applyFilters();
+        document.getElementById('load-status').textContent = `${filename} importé (${state.rows.length} lignes).`;
+      } catch (error) {
+        document.getElementById('load-status').textContent = `Erreur de lecture : ${error.message}`;
+        console.error(error);
       }
-      const fallback = dayjs(str);
-      return fallback.isValid() ? fallback : null;
     }
 
-    function parseNumeric(value) {
-      if (value === undefined || value === null || value === '') return null;
-      const numeric = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9,.-]+/g, '').replace(',', '.'));
-      return Number.isFinite(numeric) ? numeric : null;
-    }
-
-    function hydrateDataset(data) {
-      state.rawData = data.filter((row) => row.date_scan);
-      computeUniqueValues();
+    async function handleCsv(file) {
+      const text = await file.text();
+      const workbook = XLSX.read(text, { type: 'string' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      const normalized = rows.map(normalizeRow);
+      state.rows = computeDerived(normalized);
+      state.manualAggregation = null;
+      state.tablePage = 0;
+      populateFilters();
       applyFilters();
+      document.getElementById('load-status').textContent = `${file.name} importé (${state.rows.length} lignes).`;
     }
 
-    function computeUniqueValues() {
-      const partenaires = new Set();
-      const offres = new Set();
-      const etats = new Set();
-      const regions = new Set();
-      const categories = new Set();
-      state.rawData.forEach((row) => {
-        if (row.partenaire) partenaires.add(row.partenaire);
-        if (row.offre) offres.add(row.offre);
-        if (row.etat_pass) etats.add(row.etat_pass);
-        if (row.region) regions.add(row.region);
-        if (row.categorie) categories.add(row.categorie);
-      });
-      state.uniqueValues.partenaire = Array.from(partenaires).sort(localeSort);
-      state.uniqueValues.offre = Array.from(offres).sort(localeSort);
-      state.uniqueValues.etat_pass = Array.from(etats).sort(localeSort);
-      state.uniqueValues.region = Array.from(regions).sort(localeSort);
-      state.uniqueValues.categorie = Array.from(categories).sort(localeSort);
-      populateFilterOptions();
-    }
-
-    function populateFilterOptions() {
-      const selectPartenaire = document.getElementById('filter-partenaire');
-      const selectOffre = document.getElementById('filter-offre');
-      const selectEtat = document.getElementById('filter-etat');
-      const selectRegion = document.getElementById('filter-region');
-      const selectCategorie = document.getElementById('filter-categorie');
-      const createOptions = (select, values, selected) => {
-        select.innerHTML = '';
-        values.forEach((value) => {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = value;
-          if (selected.includes(value)) option.selected = true;
-          select.appendChild(option);
-        });
-      };
-      createOptions(selectPartenaire, state.uniqueValues.partenaire, state.filters.partenaire);
-      createOptions(selectOffre, state.uniqueValues.offre, state.filters.offre);
-      createOptions(selectEtat, state.uniqueValues.etat_pass, state.filters.etat_pass);
-      createOptions(selectRegion, state.uniqueValues.region, state.filters.region);
-      createOptions(selectCategorie, state.uniqueValues.categorie, state.filters.categorie);
-    }
-
-    function applyFilters(options = { debounce: true, ignoreDate: false }) {
-      if (options.debounce) {
-        clearTimeout(state.debounceTimer);
-        state.debounceTimer = setTimeout(() => applyFilters({ debounce: false, ignoreDate: options.ignoreDate }), 120);
-        return;
+    function handleDataFile(file) {
+      if (!file) return;
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        handleCsv(file);
+      } else {
+        file.arrayBuffer().then(buffer => handleWorkbook(buffer, file.name));
       }
-      const start = state.filters.dateStart ? dayjs(state.filters.dateStart) : null;
-      const end = state.filters.dateEnd ? dayjs(state.filters.dateEnd) : null;
-      const partenaires = new Set(state.filters.partenaire);
-      const offres = new Set(state.filters.offre);
-      const etats = new Set(state.filters.etat_pass);
-      const regions = new Set(state.filters.region);
-      const categories = new Set(state.filters.categorie);
-      state.filteredData = state.rawData.filter((row) => {
-        const date = row.date_scan ? dayjs(row.date_scan) : null;
-        if (!options.ignoreDate) {
-          if (start && (!date || date.isBefore(start, 'day'))) return false;
-          if (end && (!date || date.isAfter(end, 'day'))) return false;
+    }
+
+    function populateFilters() {
+      const partners = [...new Set(state.rows.map(r => r.partenaire))].sort((a, b) => a.localeCompare(b));
+      const offers = [...new Set(state.rows.map(r => r.offre))].sort((a, b) => a.localeCompare(b));
+      fillSelect(document.getElementById('filter-partenaires'), partners);
+      fillSelect(document.getElementById('filter-offres'), offers);
+      const dates = state.rows.map(r => r.date.getTime());
+      if (dates.length) {
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        document.getElementById('filter-date-start').value = min.toISOString().split('T')[0];
+        document.getElementById('filter-date-end').value = max.toISOString().split('T')[0];
+      }
+    }
+
+    function fillSelect(select, values) {
+      const current = new Set(Array.from(select.selectedOptions).map(o => o.value));
+      select.innerHTML = '';
+      values.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        if (current.has(value)) option.selected = true;
+        select.appendChild(option);
+      });
+    }
+
+    function applyFilters() {
+      state.tablePage = 0;
+      state.topOfferLimit = 0;
+      state.topOfferSearch = '';
+      const searchInput = document.getElementById('top-offres-search');
+      if (searchInput) searchInput.value = '';
+      const start = document.getElementById('filter-date-start').value;
+      const end = document.getElementById('filter-date-end').value;
+      const selectedPartners = new Set(Array.from(document.getElementById('filter-partenaires').selectedOptions).map(o => o.value));
+      const selectedOffers = new Set(Array.from(document.getElementById('filter-offres').selectedOptions).map(o => o.value));
+
+      state.filtered = state.rows.filter(row => {
+        if (start && row.date < new Date(start)) return false;
+        if (end) {
+          const endDate = new Date(end);
+          endDate.setHours(23, 59, 59, 999);
+          if (row.date > endDate) return false;
         }
-        if (partenaires.size && !partenaires.has(row.partenaire)) return false;
-        if (offres.size && !offres.has(row.offre)) return false;
-        if (etats.size && !etats.has(row.etat_pass)) return false;
-        const regionValue = row.region || '';
-        const categorieValue = row.categorie || '';
-        if (regions.size && !regions.has(regionValue)) return false;
-        if (categories.size && !categories.has(categorieValue)) return false;
+        if (selectedPartners.size && !selectedPartners.has(row.partenaire)) return false;
+        if (selectedOffers.size && !selectedOffers.has(row.offre)) return false;
         return true;
       });
+
+      if (state.filtered.length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+      } else {
+        document.getElementById('empty-state').classList.add('hidden');
+      }
+
       computeKpis();
-      computeSmartAnalysis();
-      renderKpis();
       renderCharts();
-      renderSmartAnalysis();
-      renderTable();
-      persistFilters();
-    }
-
-    function groupByMonth(rows) {
-      const buckets = new Map();
-      rows.forEach((row) => {
-        if (!row.date_scan) return;
-        const d = dayjs(row.date_scan);
-        if (!d.isValid()) return;
-        const key = d.format('YYYY-MM');
-        const label = d.format('MMM YYYY');
-        if (!buckets.has(key)) {
-          buckets.set(key, { label, count: 0 });
-        }
-        buckets.get(key).count += 1;
-      });
-      return Array.from(buckets.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([, value]) => value);
-    }
-
-    function groupBy(rows, field) {
-      const buckets = new Map();
-      rows.forEach((row) => {
-        const key = row[field] || 'Non renseigné';
-        if (!buckets.has(key)) {
-          buckets.set(key, { label: key, count: 0 });
-        }
-        buckets.get(key).count += 1;
-      });
-      return Array.from(buckets.values()).sort((a, b) => b.count - a.count);
+      renderTables();
     }
 
     function computeKpis() {
-      state.kpis = {};
-      const filtered = state.filteredData;
-      state.kpis.totalScans = filtered.length;
-      state.kpis.offresDistinctes = new Set(filtered.map((r) => r.offre)).size;
-      state.kpis.partenairesDistincts = new Set(filtered.map((r) => r.partenaire)).size;
+      const totalScans = state.filtered.length;
+      const montant = state.filtered.reduce((sum, row) => sum + (row.valeur || 0), 0);
+      const offres = new Set(state.filtered.map(row => row.offre)).size;
+      const partenaires = new Set(state.filtered.map(row => row.partenaire)).size;
 
-      const etatCounts = groupBy(filtered, 'etat_pass');
-      const total = filtered.length || 1;
-      state.kpis.repartitionEtat = etatCounts.map((item) => ({
-        label: item.label,
-        count: item.count,
-        percent: (item.count / total) * 100
-      }));
-
-      const byMonth = groupByMonth(filtered);
-      if (byMonth.length >= 2) {
-        const last = byMonth[byMonth.length - 1].count;
-        const prev = byMonth[byMonth.length - 2].count;
-        const variation = prev === 0 ? 100 : ((last - prev) / prev) * 100;
-        state.kpis.mom = { variation, last, prev };
-      } else {
-        state.kpis.mom = null;
-      }
-
-      const valeurs = filtered.map((r) => r.valeur_offre).filter((v) => v !== null && !Number.isNaN(v));
-      if (valeurs.length) {
-        const sum = valeurs.reduce((acc, val) => acc + val, 0);
-        state.kpis.valeurTotale = sum;
-        state.kpis.valeurMoyenne = sum / valeurs.length;
-      } else {
-        state.kpis.valeurTotale = null;
-        state.kpis.valeurMoyenne = null;
-      }
+      document.getElementById('kpi-scans').textContent = numberFormatter.format(totalScans);
+      document.getElementById('kpi-amount').textContent = currencyFormatter.format(montant);
+      document.getElementById('kpi-offres').textContent = numberFormatter.format(offres);
+      document.getElementById('kpi-partenaires').textContent = numberFormatter.format(partenaires);
     }
 
-    function computeSmartAnalysis() {
-      const rows = state.filteredData;
-      if (!rows.length) {
-        state.smartAnalysis = null;
-        return;
+    function groupBy(key) {
+      return state.filtered.reduce((acc, row) => {
+        const group = row[key];
+        if (!group) return acc;
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(row);
+        return acc;
+      }, {});
+    }
+
+    function aggregateTemporal() {
+      if (state.aggregation === 'quarter') {
+        const grouped = groupBy('trimestre');
+        return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([period, rows]) => ({
+          period,
+          total: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+          scans: rows.length
+        }));
       }
-      const { period, dimension } = state.smart;
-      const buckets = bucketRowsByPeriod(rows, period);
-      if (!buckets.length) {
-        state.smartAnalysis = null;
-        return;
-      }
-      const latestBucket = buckets[buckets.length - 1];
-      const previousBucket = buckets.length > 1 ? buckets[buckets.length - 2] : null;
-      const hasPrevious = Boolean(previousBucket);
-      const aggregate = (bucketRows) => {
-        const map = new Map();
-        bucketRows.forEach((row) => {
-          const key = row[dimension] || 'Non renseigné';
-          if (!map.has(key)) {
-            map.set(key, { label: key, scans: 0, valeur: 0, valeurCount: 0 });
-          }
-          const entry = map.get(key);
-          entry.scans += 1;
-          if (row.valeur_offre !== null && row.valeur_offre !== undefined && row.valeur_offre !== '') {
-            const numeric = Number(row.valeur_offre);
-            if (Number.isFinite(numeric)) {
-              entry.valeur += numeric;
-              entry.valeurCount += 1;
-            }
-          }
-        });
-        return Array.from(map.values());
-      };
-
-      const currentAgg = aggregate(latestBucket.rows);
-      const previousAgg = previousBucket ? aggregate(previousBucket.rows) : [];
-      const previousMap = new Map(previousAgg.map((item) => [item.label, item]));
-
-      const computeVariation = (currentValue, previousValue) => {
-        if (currentValue === null || currentValue === undefined) return null;
-        if (previousValue === null || previousValue === undefined) return null;
-        if (!previousValue && !currentValue) return 0;
-        if (!previousValue) return 100;
-        return ((currentValue - previousValue) / previousValue) * 100;
-      };
-
-      const rowsComputed = currentAgg
-        .map((item) => {
-          const prev = previousMap.get(item.label) || { scans: 0, valeur: 0, valeurCount: 0 };
-          const currentValue = item.valeurCount ? item.valeur : null;
-          const previousValue = prev.valeurCount ? prev.valeur : prev.valeurCount === 0 ? null : prev.valeur;
-          const variationScans = hasPrevious ? computeVariation(item.scans, prev.scans) : null;
-          const variationValeur = hasPrevious ? computeVariation(currentValue, previousValue) : null;
-          return {
-            label: item.label,
-            currentScans: item.scans,
-            previousScans: prev.scans || 0,
-            variationScans,
-            currentValeur: currentValue,
-            previousValeur: hasPrevious ? previousValue : null,
-            variationValeur,
-            moyenneValeur: item.valeurCount ? item.valeur / item.valeurCount : null
-          };
-        })
-        .sort((a, b) => b.currentScans - a.currentScans)
-        .slice(0, 10);
-
-      if (!rowsComputed.length) {
-        state.smartAnalysis = null;
-        return;
-      }
-
-      state.smartAnalysis = {
+      const grouped = groupBy('mois');
+      return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([period, rows]) => ({
         period,
-        dimension,
-        currentLabel: latestBucket.label,
-        previousLabel: previousBucket ? previousBucket.label : null,
-        rows: rowsComputed
-      };
+        total: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+        scans: rows.length
+      }));
     }
 
-    function bucketRowsByPeriod(rows, period) {
-      const buckets = new Map();
-      rows.forEach((row) => {
-        if (!row.date_scan) return;
-        const date = dayjs(row.date_scan);
-        if (!date.isValid()) return;
-        const meta = getPeriodMeta(date, period);
-        if (!buckets.has(meta.key)) {
-          buckets.set(meta.key, { label: meta.label, rows: [] });
-        }
-        buckets.get(meta.key).rows.push(row);
+    function determineAggregation() {
+      if (state.manualAggregation) {
+        state.aggregation = state.manualAggregation;
+      } else {
+        const months = new Set(state.filtered.map(row => row.mois)).size;
+        state.aggregation = months > 36 ? 'quarter' : 'month';
+      }
+      document.querySelectorAll('input[name="time-aggregation"]').forEach(input => {
+        input.checked = input.value === state.aggregation;
       });
-      return Array.from(buckets.entries())
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([, value]) => value);
     }
 
-    function getPeriodMeta(date, period) {
-      if (period === 'year') {
-        const key = date.format('YYYY');
-        return { key, label: key };
+    function applyTopOfferRules(offreGroups, universe = offreGroups.length) {
+      const totalOffers = offreGroups.length;
+      let limit = totalOffers;
+      let caption = '';
+      const moreBtn = document.getElementById('top-offres-more');
+      const allBtn = document.getElementById('top-offres-all');
+      const search = document.getElementById('top-offres-search');
+      moreBtn.classList.add('hidden');
+      allBtn.classList.add('hidden');
+      search.classList.add('hidden');
+
+      if (totalOffers <= 10) {
+        limit = totalOffers;
+        caption = `${totalOffers} offres affichées`;
+      } else if (totalOffers <= 30) {
+        limit = Math.min(15, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+      } else if (totalOffers <= 100) {
+        limit = Math.min(20 + state.topOfferLimit, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+        if (limit < totalOffers) {
+          moreBtn.classList.remove('hidden');
+          moreBtn.textContent = `Voir +${Math.min(20, totalOffers - limit)}`;
+        }
+      } else {
+        limit = Math.min(25 + state.topOfferLimit, totalOffers);
+        caption = `Top ${limit} sur ${totalOffers}`;
+        search.classList.remove('hidden');
+        allBtn.classList.remove('hidden');
+        if (!state.topOfferLimit) {
+          allBtn.textContent = 'Afficher tout';
+        }
       }
-      if (period === 'quarter') {
-        const quarter = Math.floor(date.month() / 3) + 1;
-        const year = date.format('YYYY');
-        return { key: `${year}-Q${quarter}`, label: `T${quarter} ${year}` };
+      if (universe !== totalOffers) {
+        caption += ` (filtré sur ${universe})`;
       }
-      const key = date.format('YYYY-MM');
-      return { key, label: date.format('MMM YYYY') };
+
+      document.getElementById('top-offres-caption').textContent = caption;
+      return offreGroups.slice(0, Math.min(limit, totalOffers));
     }
 
-    function renderKpis() {
-      document.getElementById('kpi-total-scans').textContent = formatNumber(state.kpis.totalScans || 0);
-      document.getElementById('kpi-offres').textContent = formatNumber(state.kpis.offresDistinctes || 0);
-      document.getElementById('kpi-partenaires').textContent = formatNumber(state.kpis.partenairesDistincts || 0);
-      const etatContainer = document.getElementById('kpi-etat');
-      etatContainer.innerHTML = '';
-      if (state.kpis.repartitionEtat && state.kpis.repartitionEtat.length) {
-        state.kpis.repartitionEtat.forEach((item, index) => {
-          const badge = document.createElement('span');
-          badge.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold';
-          badge.style.backgroundColor = tinyColor(getColor(index)).setAlpha(0.1).toRgbString();
-          badge.style.color = getColor(index);
-          badge.textContent = `${item.label}: ${item.percent.toFixed(1)}%`;
-          etatContainer.appendChild(badge);
-        });
-      } else {
-        const empty = document.createElement('span');
-        empty.className = 'text-xs text-slate-400';
-        empty.textContent = 'Aucune donnée';
-        etatContainer.appendChild(empty);
-      }
-      const momEl = document.getElementById('kpi-mom');
-      if (state.kpis.mom) {
-        const variation = state.kpis.mom.variation;
-        const arrow = variation >= 0 ? '↑' : '↓';
-        const color = variation >= 0 ? 'text-pass-jeunes-green' : 'text-red-500';
-        momEl.className = `text-2xl font-semibold mt-2 ${color}`;
-        momEl.textContent = `${arrow} ${variation.toFixed(1)}%`;
-      } else {
-        momEl.className = 'text-2xl font-semibold mt-2 text-slate-400';
-        momEl.textContent = 'N/A';
-      }
-      const valeursEl = document.getElementById('kpi-valeurs');
-      if (state.kpis.valeurTotale !== null) {
-        valeursEl.className = 'text-2xl font-semibold mt-2 text-pass-jeunes-blue';
-        valeursEl.textContent = `${formatCurrency(state.kpis.valeurTotale)} · ${formatCurrency(state.kpis.valeurMoyenne)}/scan`;
-      } else {
-        valeursEl.className = 'text-2xl font-semibold mt-2 text-slate-400';
-        valeursEl.textContent = 'N/A';
-      }
+    function filterOffersBySearch(groups) {
+      if (!state.topOfferSearch) return groups;
+      return groups.filter(group => group.name.toLowerCase().includes(state.topOfferSearch.toLowerCase()));
     }
 
     function renderCharts() {
-      renderTrendChart();
-      renderTopOffresChart();
-      renderTopPartenairesChart();
-      renderEtatChart();
+      determineAggregation();
+      const aggregated = aggregateTemporal();
+      renderLineChart('chart-montants', aggregated.map(a => a.period), aggregated.map(a => a.total));
+      renderLineChart('chart-scans', aggregated.map(a => a.period), aggregated.map(a => a.scans), true);
+
+      const groupedOffers = Object.entries(groupBy('offre')).map(([offre, rows]) => ({
+        name: offre,
+        montant: rows.reduce((sum, row) => sum + (row.valeur || 0), 0),
+        scans: rows.length
+      })).sort((a, b) => b.montant - a.montant);
+
+      const filteredBySearch = filterOffersBySearch(groupedOffers);
+      const displayGroups = applyTopOfferRules(filteredBySearch, groupedOffers.length);
+
+      const labels = displayGroups.map(g => abbreviate(g.name));
+      const tooltipLabels = displayGroups.map(g => g.name);
+      const data = displayGroups.map(g => g.montant);
+      const colors = displayGroups.map((_, idx) => state.palette[idx % state.palette.length]);
+      const orientation = displayGroups.length > 15 ? 'y' : 'x';
+      const minHeight = Math.min(720, Math.max(280, displayGroups.length * 16));
+      const canvas = document.getElementById('chart-offres');
+      canvas.parentElement.style.minHeight = `${minHeight}px`;
+
+      const axisConfig = orientation === 'y'
+        ? {
+            x: {
+              ticks: { callback: value => formatShortNumber(value) },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            },
+            y: {
+              ticks: { autoSkip: false, callback: (value, index) => labels[index] },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            }
+          }
+        : {
+            x: {
+              ticks: {
+                autoSkip: false,
+                maxRotation: labels.some(label => label.length > 12) ? 60 : 30,
+                callback: (value, index) => labels[index]
+              },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            },
+            y: {
+              ticks: { callback: value => formatShortNumber(value) },
+              grid: { color: 'rgba(15,23,42,0.06)' }
+            }
+          };
+
+      const config = {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Montant consommé',
+            data,
+            backgroundColor: colors.map(color => `${color}CC`),
+            borderColor: colors,
+            hoverBackgroundColor: colors.map(color => lightenColor(color, -20)),
+            borderWidth: 1.5,
+            maxBarThickness: orientation === 'y' ? 28 : 42,
+            categoryPercentage: orientation === 'y' ? 0.7 : 0.8,
+            barPercentage: orientation === 'y' ? 0.9 : 0.8
+          }]
+        },
+        options: {
+          indexAxis: orientation,
+          maintainAspectRatio: false,
+          responsive: true,
+          interaction: { intersect: false, mode: 'nearest' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                title: items => tooltipLabels[items[0].dataIndex],
+                label: context => `${currencyFormatter.format(context.parsed.y ?? context.parsed.x)}`
+              }
+            }
+          },
+          scales: axisConfig
+        }
+      };
+
+      updateChart('chart-offres', config);
     }
 
-    function renderSmartAnalysis() {
-      const body = document.getElementById('smart-analysis-body');
-      const subtitle = document.getElementById('smart-subtitle');
-      const headerCurrent = document.getElementById('smart-header-current');
-      body.innerHTML = '';
-      if (!state.smartAnalysis || !state.smartAnalysis.rows.length) {
-        subtitle.textContent = 'Sélectionnez une période et importez des données pour activer l’analyse.';
-        headerCurrent.textContent = 'Scans';
-        const empty = document.createElement('tr');
-        empty.innerHTML = '<td colspan="6" class="px-4 py-6 text-center text-sm text-slate-400">Aucune donnée disponible pour cette configuration.</td>';
-        body.appendChild(empty);
-        return;
-      }
-      const { dimension, period, currentLabel, previousLabel, rows } = state.smartAnalysis;
-      const dimensionLabel = DIMENSION_LABELS[dimension] || dimension;
-      const periodLabel = PERIOD_LABELS[period] || period;
-      const comparison = previousLabel ? ` · vs ${previousLabel}` : '';
-      subtitle.textContent = `Segments ${dimensionLabel} — ${currentLabel}${comparison} · agrégation ${periodLabel}`;
-      headerCurrent.textContent = `Scans (${currentLabel})`;
-      rows.forEach((row, index) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="px-4 py-3">${escapeHtml(row.label)}</td>
-          <td class="px-4 py-3 text-right">${formatNumber(row.currentScans)}</td>
-          <td class="px-4 py-3 text-right">${formatVariation(row.variationScans)}</td>
-          <td class="px-4 py-3 text-right">${row.currentValeur !== null ? formatCurrency(row.currentValeur) : '—'}</td>
-          <td class="px-4 py-3 text-right">${formatVariation(row.variationValeur, true)}</td>
-          <td class="px-4 py-3 text-right">${row.moyenneValeur !== null ? formatCurrency(row.moyenneValeur) : '—'}</td>`;
-        tr.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'rgba(248,250,252,1)';
-        body.appendChild(tr);
-      });
-    }
-
-    function renderTrendChart() {
-      const ctx = document.getElementById('chart-trend');
-      const dataByMonth = groupByMonth(state.filteredData);
-      const labels = dataByMonth.map((item) => item.label);
-      const values = dataByMonth.map((item) => item.count);
-      setResponsiveCanvasHeight(ctx, labels.length, { min: 220, max: 420, perItem: 22, padding: 140 });
-      const datasetColor = getColor(0);
-      updateChart('trend', ctx, {
+    function renderLineChart(id, labels, data, countMode = false) {
+      const canvas = document.getElementById(id);
+      const config = {
         type: 'line',
         data: {
           labels,
-          datasets: [
-            {
-              label: 'Scans',
-              data: values,
-              borderColor: datasetColor,
-              backgroundColor: tinyColor(datasetColor).setAlpha(0.2).toRgbString(),
-              fill: true,
-              tension: 0.3,
-              pointRadius: 4,
-              pointHoverRadius: 6
-            }
-          ]
+          datasets: [{
+            label: countMode ? 'Nombre de scans' : 'Montant',
+            data,
+            fill: true,
+            tension: 0.35,
+            backgroundColor: `${state.palette[0]}33`,
+            borderColor: state.palette[0],
+            pointBackgroundColor: state.palette[1] || state.palette[0],
+            pointBorderWidth: 2,
+            pointRadius: 3
+          }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: {
-              beginAtZero: true,
-              suggestedMax: computeAdaptiveMax(values),
-              ticks: { callback: (value) => formatNumber(value) }
+            x: {
+              grid: { color: 'rgba(15,23,42,0.06)' }
             },
-            x: {
-              ticks: {
-                maxRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: Math.min(12, Math.max(2, labels.length))
-              }
-            }
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (context) => `${context.parsed.y} scans`
-              }
-            }
-          }
-        }
-      });
-    }
-
-    function renderTopOffresChart() {
-      const ctx = document.getElementById('chart-top-offres');
-      let baseData = state.filteredData;
-      if (state.topOffresMode === 'current') {
-        const latest = [...baseData].filter((row) => row.date_scan).sort((a, b) => dayjs(b.date_scan).valueOf() - dayjs(a.date_scan).valueOf())[0];
-        if (latest) {
-          const latestMonth = dayjs(latest.date_scan).format('YYYY-MM');
-          baseData = baseData.filter((row) => dayjs(row.date_scan).format('YYYY-MM') === latestMonth);
-        }
-      } else if (state.topOffresMode === 'global') {
-        baseData = state.rawData.filter((row) => filterNonDate(row));
-      }
-      const grouped = groupBy(baseData, 'offre').slice(0, 10);
-      const labels = grouped.map((g) => g.label);
-      const data = grouped.map((g) => g.count);
-      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.8).toRgbString());
-      setResponsiveCanvasHeight(ctx, labels.length, { min: 240, max: 520, perItem: 36, padding: 80 });
-      updateChart('topOffres', ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Nombre de scans',
-              data,
-              backgroundColor: colors,
-              borderColor: labels.map((_, idx) => getColor(idx)),
-              borderWidth: 1,
-              borderRadius: 8
-            }
-          ]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              beginAtZero: true,
-              suggestedMax: computeAdaptiveMax(data),
-              ticks: { callback: (value) => formatNumber(value) }
-            }
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => `${ctx.parsed.x} scans`
-              }
-            }
-          }
-        }
-      });
-    }
-
-    function renderTopPartenairesChart() {
-      const ctx = document.getElementById('chart-top-partenaires');
-      const grouped = groupBy(state.filteredData, 'partenaire').slice(0, 10);
-      const labels = grouped.map((g) => g.label);
-      const data = grouped.map((g) => g.count);
-      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.8).toRgbString());
-      setResponsiveCanvasHeight(ctx, labels.length, { min: 240, max: 520, perItem: 36, padding: 80 });
-      updateChart('topPartenaires', ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Scans',
-              data,
-              backgroundColor: colors,
-              borderColor: labels.map((_, idx) => getColor(idx)),
-              borderRadius: 6
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
             y: {
-              beginAtZero: true,
-              suggestedMax: computeAdaptiveMax(data),
-              ticks: { callback: (value) => formatNumber(value) }
+              ticks: {
+                callback: value => countMode ? numberFormatter.format(value) : formatShortNumber(value)
+              },
+              grid: { color: 'rgba(15,23,42,0.06)' }
             }
           },
           plugins: {
             legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y} scans` } }
-          }
-        }
-      });
-    }
-
-    function renderEtatChart() {
-      const ctx = document.getElementById('chart-etat');
-      const grouped = groupBy(state.filteredData, 'etat_pass');
-      const labels = grouped.map((g) => g.label);
-      const data = grouped.map((g) => g.count);
-      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.85).toRgbString());
-      setResponsiveCanvasHeight(ctx, labels.length, { min: 220, max: 400, perItem: 26, padding: 120 });
-      updateChart('etat', ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [
-            {
-              data,
-              backgroundColor: colors,
-              borderColor: labels.map((_, idx) => getColor(idx)),
-              borderWidth: 1
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                padding: 12,
-                boxWidth: 14
+            tooltip: {
+              callbacks: {
+                label: context => countMode ? `${numberFormatter.format(context.parsed.y)} scans` : `${currencyFormatter.format(context.parsed.y)}`
               }
             }
           }
         }
-      });
+      };
+      updateChart(id, config);
     }
 
-    function updateChart(key, canvas, config) {
-      if (state.charts[key]) {
-        state.charts[key].destroy();
+    function updateChart(id, config) {
+      if (state.charts[id]) {
+        state.charts[id].destroy();
       }
-      state.charts[key] = new Chart(canvas, config);
+      state.charts[id] = new Chart(document.getElementById(id).getContext('2d'), config);
     }
 
-    function setResponsiveCanvasHeight(canvas, itemCount, { min = 220, max = 520, perItem = 32, padding = 120 } = {}) {
-      if (!canvas) return;
-      const container = canvas.parentElement;
-      if (!container) return;
-      const computed = Math.min(max, Math.max(min, padding + (itemCount || 0) * perItem));
-      container.style.height = `${computed}px`;
-      canvas.height = computed;
+    function refreshCharts() {
+      Object.keys(state.charts).forEach(id => state.charts[id].destroy());
+      state.charts = {};
+      renderCharts();
     }
 
-    function computeAdaptiveMax(values) {
-      if (!values || !values.length) return undefined;
-      const maxValue = values.reduce((acc, value) => (value > acc ? value : acc), 0);
-      if (!maxValue) return undefined;
-      const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
-      const scaled = Math.ceil((maxValue * 1.1) / magnitude) * magnitude;
-      return scaled;
+    function abbreviate(label) {
+      if (label.length <= 24) return label;
+      return `${label.slice(0, 24)}…`;
     }
 
-    function renderTable() {
-      const tbody = document.getElementById('table-body');
+    function renderTables() {
+      const groupedByMonth = aggregateTemporal();
+      const monthlyDetails = groupedByMonth.map(group => {
+        const rows = state.filtered.filter(row => (state.aggregation === 'quarter' ? row.trimestre : row.mois) === group.period);
+        const montantTop = Object.entries(rows.reduce((acc, row) => {
+          acc[row.offre] = (acc[row.offre] || 0) + (row.valeur || 0);
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const scansTop = Object.entries(rows.reduce((acc, row) => {
+          acc[row.offre] = (acc[row.offre] || 0) + 1;
+          return acc;
+        }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        return {
+          period: group.period,
+          montantTop,
+          scansTop
+        };
+      });
+      const tbody = document.getElementById('table-top-offres');
       tbody.innerHTML = '';
-      const rows = state.filteredData;
-      const formatter = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-      const maxRows = 2000;
-      const displayedRows = rows.slice(0, maxRows);
-      displayedRows.forEach((row) => {
+      monthlyDetails.forEach(item => {
         const tr = document.createElement('tr');
+        const montantList = item.montantTop.map(([offre, montant]) => `<span class="block">${offre} – <strong>${currencyFormatter.format(montant)}</strong></span>`).join('') || '<span class="text-slate-400">Aucune donnée</span>';
+        const scansList = item.scansTop.map(([offre, scans]) => `<span class="block">${offre} – <strong>${numberFormatter.format(scans)}</strong></span>`).join('') || '<span class="text-slate-400">Aucune donnée</span>';
         tr.innerHTML = `
-          <td class="px-4 py-3 whitespace-nowrap">${row.date_scan ? dayjs(row.date_scan).format('DD MMM YYYY') : ''}</td>
-          <td class="px-4 py-3">${escapeHtml(row.partenaire)}</td>
-          <td class="px-4 py-3">${escapeHtml(row.offre)}</td>
-          <td class="px-4 py-3">${escapeHtml(row.etat_pass)}</td>
-          <td class="px-4 py-3">${escapeHtml(row.region)}</td>
-          <td class="px-4 py-3">${escapeHtml(row.categorie)}</td>
-          <td class="px-4 py-3 text-right">${row.valeur_offre !== null ? formatter.format(row.valeur_offre) : ''}</td>`;
+          <td class="py-3 pr-4 text-[color:var(--pj-blue)] font-semibold">${item.period}</td>
+          <td class="py-3 pr-4">${montantList}</td>
+          <td class="py-3 pr-4">${scansList}</td>
+        `;
         tbody.appendChild(tr);
       });
-      const countEl = document.getElementById('table-count');
-      if (rows.length > displayedRows.length) {
-        countEl.textContent = `${formatNumber(displayedRows.length)} lignes affichées sur ${formatNumber(rows.length)} (limite pour préserver les performances).`;
+
+      const sorted = [...state.filtered].sort((a, b) => {
+        const { key, direction } = state.tableSort;
+        const factor = direction === 'asc' ? 1 : -1;
+        if (key === 'date') return factor * (a.date - b.date);
+        if (key === 'montant') return factor * ((a.valeur || 0) - (b.valeur || 0));
+        return factor * a[key].localeCompare(b[key]);
+      });
+
+      const startIndex = state.tablePage * state.tablePageSize;
+      const pageRows = sorted.slice(startIndex, startIndex + state.tablePageSize);
+      const tbodyDetails = document.getElementById('table-details');
+      tbodyDetails.innerHTML = '';
+      pageRows.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2 pr-4">${row.date.toLocaleDateString('fr-MA')}</td>
+          <td class="py-2 pr-4">${row.partenaire}</td>
+          <td class="py-2 pr-4">${row.offre}</td>
+          <td class="py-2 pr-4 text-right">${currencyFormatter.format(row.valeur || 0)}</td>
+        `;
+        tbodyDetails.appendChild(tr);
+      });
+      const info = document.getElementById('table-pagination-info');
+      if (!sorted.length) {
+        info.textContent = '0 entrée';
       } else {
-        countEl.textContent = `${formatNumber(rows.length)} lignes affichées`;
+        info.textContent = `${startIndex + 1}-${Math.min(startIndex + state.tablePageSize, sorted.length)} sur ${numberFormatter.format(sorted.length)} entrées`;
       }
     }
 
-    function downloadCSV(rows) {
-      if (!rows.length) {
-        alert('Aucune donnée à exporter.');
-        return;
-      }
-      const headers = ['partenaire', 'offre', 'etat_pass', 'region', 'categorie', 'date_scan', 'valeur_offre'];
-      const csvRows = [headers.join(',')];
-      rows.forEach((row) => {
-        const values = headers.map((header) => {
-          const value = row[header];
-          if (header === 'date_scan' && value) {
-            return `"${dayjs(value).format('YYYY-MM-DD')}"`;
-          }
-          if (value === null || value === undefined) return '""';
-          const str = String(value).replace(/"/g, '""');
-          return `"${str}"`;
-        });
-        csvRows.push(values.join(','));
-      });
-      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    function exportTableCsv() {
+      const headers = ['Date', 'Partenaire', 'Offre', 'Valeur'];
+      const rows = state.filtered.map(row => [row.date.toISOString().split('T')[0], row.partenaire, row.offre, row.valeur]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `scans_filtrés_${dayjs().format('YYYYMMDD_HHmm')}.csv`;
-      document.body.appendChild(link);
+      link.href = url;
+      link.download = 'scans-filtrés.csv';
       link.click();
-      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
-    function downloadPNG(chart) {
+    function exportChart(id) {
+      const chart = state.charts[id];
+      if (!chart) return;
       const link = document.createElement('a');
-      link.href = chart.toBase64Image();
-      link.download = `${chart.canvas.id}_${dayjs().format('YYYYMMDD_HHmmss')}.png`;
+      link.href = chart.toBase64Image('image/png', 1);
+      link.download = `${id}.png`;
       link.click();
     }
 
-    async function downloadPDF() {
-      if (!state.filteredData.length) {
-        alert('Aucune donnée pour le rapport.');
-        return;
-      }
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-      let y = 40;
-      doc.setFontSize(18);
-      doc.setTextColor(28, 44, 91);
-      doc.text('Pass Jeunes — Rapport scans2025', 40, y);
-      y += 30;
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`Généré le ${dayjs().format('DD/MM/YYYY HH:mm')}`, 40, y);
-      y += 20;
-      doc.setFontSize(12);
-      doc.setTextColor(28, 44, 91);
-      const kpis = [
-        `Scans: ${formatNumber(state.kpis.totalScans || 0)}`,
-        `Offres distinctes: ${formatNumber(state.kpis.offresDistinctes || 0)}`,
-        `Partenaires distincts: ${formatNumber(state.kpis.partenairesDistincts || 0)}`
-      ];
-      if (state.kpis.mom) {
-        kpis.push(`Croissance MoM: ${state.kpis.mom.variation.toFixed(1)}%`);
-      }
-      if (state.kpis.valeurTotale !== null) {
-        kpis.push(`Valeur totale: ${formatCurrency(state.kpis.valeurTotale)}`);
-        kpis.push(`Valeur moyenne: ${formatCurrency(state.kpis.valeurMoyenne)}`);
-      }
-      doc.text(kpis.join('\n'), 40, y);
-      y += kpis.length * 16 + 10;
+    function updateAssignments() {
+      const hero = state.assignments.hero;
+      const watermark = state.assignments.watermark;
+      const empty = state.assignments.empty;
+      const section = state.assignments.section;
 
-      if (state.smartAnalysis && state.smartAnalysis.rows && state.smartAnalysis.rows.length) {
-        doc.setFontSize(12);
-        doc.setTextColor(28, 44, 91);
-        const smart = state.smartAnalysis;
-        doc.text('Analyse intelligente', 40, y);
-        y += 16;
-        doc.setFontSize(10);
-        doc.setTextColor(90);
-        const smartSubtitle = `Segments ${DIMENSION_LABELS[smart.dimension] || smart.dimension} — ${smart.currentLabel}${smart.previousLabel ? ` vs ${smart.previousLabel}` : ''} · agrégation ${PERIOD_LABELS[smart.period] || smart.period}`;
-        doc.text(smartSubtitle, 40, y);
-        y += 14;
-        doc.setTextColor(60);
-        const lines = smart.rows.slice(0, 6);
-        lines.forEach((row) => {
-          const line = `${row.label} · ${formatNumber(row.currentScans)} scans (${formatVariationPlain(row.variationScans)})`;
-          doc.text(line, 40, y);
-          y += 14;
-          if (row.currentValeur !== null) {
-            const valeurText = `${formatCurrency(row.currentValeur)} · moy ${row.moyenneValeur !== null ? formatCurrency(row.moyenneValeur) : '—'} (${formatVariationPlain(row.variationValeur)})`;
-            doc.text(valeurText, 60, y);
-            y += 14;
-          }
-          if (y > doc.internal.pageSize.getHeight() - 80) {
-            doc.addPage();
-            y = 40;
-            doc.setFontSize(10);
-            doc.setTextColor(60);
-          }
-        });
-        doc.setTextColor(28, 44, 91);
-        y += 6;
-      }
+      const heroEl = document.getElementById('hero-visual');
+      heroEl.style.backgroundImage = hero ? `url(${hero})` : 'linear-gradient(120deg, var(--pj-blue), #1C2C5B)';
 
-      const charts = ['chart-trend', 'chart-top-offres', 'chart-top-partenaires', 'chart-etat'];
-      for (const chartId of charts) {
-        const chartInstance = state.charts[getChartKey(chartId)];
-        if (!chartInstance) continue;
-        const image = chartInstance.toBase64Image();
-        const imgProps = doc.getImageProperties(image);
-        const pdfWidth = doc.internal.pageSize.getWidth() - 80;
-        const ratio = pdfWidth / imgProps.width;
-        const pdfHeight = imgProps.height * ratio;
-        if (y + pdfHeight > doc.internal.pageSize.getHeight() - 40) {
-          doc.addPage();
-          y = 40;
-        }
-        doc.addImage(image, 'PNG', 40, y, pdfWidth, pdfHeight);
-        y += pdfHeight + 20;
-      }
-      doc.save(`rapport_scans_${dayjs().format('YYYYMMDD_HHmm')}.pdf`);
-    }
-
-    function getChartKey(canvasId) {
-      switch (canvasId) {
-        case 'chart-trend':
-          return 'trend';
-        case 'chart-top-offres':
-          return 'topOffres';
-        case 'chart-top-partenaires':
-          return 'topPartenaires';
-        case 'chart-etat':
-          return 'etat';
-        default:
-          return canvasId;
-      }
-    }
-
-    function downloadAllCharts() {
-      Object.values(state.charts).forEach((chart) => {
-        downloadPNG(chart);
-      });
-    }
-
-    function renderTopModeButtons() {
-      document.querySelectorAll('.top-offres-mode').forEach((btn) => {
-        if (btn.dataset.mode === state.topOffresMode) {
-          btn.classList.add('bg-pass-jeunes-blue', 'text-white');
+      document.querySelectorAll('.kpi-card').forEach(card => {
+        card.style.setProperty('--watermark', watermark || '');
+        if (watermark) {
+          card.style.backgroundImage = `linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9)), url(${watermark})`;
         } else {
-          btn.classList.remove('bg-pass-jeunes-blue', 'text-white');
+          card.style.backgroundImage = 'none';
         }
+        card.style.backgroundSize = watermark ? 'cover' : 'auto';
+        card.style.backgroundRepeat = watermark ? 'no-repeat' : 'repeat';
+        card.style.backgroundPosition = 'center';
+        card.style.backgroundBlendMode = watermark ? 'lighten' : 'normal';
+      });
+
+      const sectionImg = document.getElementById('section-visual-img');
+      if (sectionImg) sectionImg.src = section || '';
+      document.querySelectorAll('[data-visual-slot="sections"] img').forEach(img => {
+        img.src = section || '';
+      });
+
+      const emptyImg = document.getElementById('empty-state-img');
+      if (emptyImg) emptyImg.src = empty || '';
+    }
+
+    function syncVisualSelectors() {
+      const heroSelect = document.getElementById('visual-hero');
+      const watermarkSelect = document.getElementById('visual-watermark');
+      const emptySelect = document.getElementById('visual-empty');
+      const sectionSelect = document.getElementById('visual-section');
+      if (heroSelect) heroSelect.value = state.assignments.hero || '';
+      if (watermarkSelect) watermarkSelect.value = state.assignments.watermark || '';
+      if (emptySelect) emptySelect.value = state.assignments.empty || '';
+      if (sectionSelect) sectionSelect.value = state.assignments.section || '';
+    }
+
+    async function handleCharte(files) {
+      if (!files || !files.length) return;
+      const palettes = [];
+      const visuals = [];
+      for (const file of files) {
+        if (file.type === 'application/pdf') {
+          const buffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await page.render({ canvasContext: context, viewport }).promise;
+            const dataUrl = canvas.toDataURL('image/png');
+            visuals.push({ name: `${file.name} – Page ${pageNum}`, url: dataUrl });
+            const palette = await extractPaletteFromImage(dataUrl);
+            if (palette.length) palettes.push(palette);
+          }
+        } else if (file.type.startsWith('image/')) {
+          const dataUrl = await readFileAsDataUrl(file);
+          visuals.push({ name: file.name, url: dataUrl });
+          const palette = await extractPaletteFromImage(dataUrl);
+          if (palette.length) palettes.push(palette);
+        }
+      }
+
+      if (visuals.length) {
+        state.visuals = visuals;
+        populateVisualSelectors();
+        state.assignments.hero = visuals[0].url;
+        state.assignments.section = visuals[0].url;
+        state.assignments.watermark = visuals[0].url;
+        state.assignments.empty = visuals[0].url;
+        syncVisualSelectors();
+        updateAssignments();
+      }
+      if (palettes.length) {
+        const merged = palettes.flat().slice(0, 5);
+        updateRootPalette(merged);
+      }
+    }
+
+    function populateVisualSelectors() {
+      const gallery = document.getElementById('visual-gallery');
+      gallery.innerHTML = '';
+      const selects = [
+        document.getElementById('visual-hero'),
+        document.getElementById('visual-watermark'),
+        document.getElementById('visual-empty'),
+        document.getElementById('visual-section')
+      ];
+      selects.forEach(select => select.innerHTML = '<option value="">Par défaut</option>');
+      state.visuals.forEach((visual, idx) => {
+        const card = document.createElement('div');
+        card.className = 'gallery-item';
+        card.innerHTML = `
+          <div class="h-24 bg-slate-100 overflow-hidden">
+            <img src="${visual.url}" alt="${visual.name}" class="w-full h-full object-cover" />
+          </div>
+          <div class="p-3">
+            <p class="font-semibold text-[color:var(--pj-blue)]">${visual.name}</p>
+          </div>
+        `;
+        gallery.appendChild(card);
+        selects.forEach(select => {
+          const option = document.createElement('option');
+          option.value = visual.url;
+          option.textContent = visual.name;
+          if (idx === 0) option.selected = true;
+          select.appendChild(option);
+        });
+      });
+      syncVisualSelectors();
+    }
+
+    async function extractPaletteFromImage(url) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const colorThief = new ColorThief();
+            const palette = colorThief.getPalette(img, 5) || [];
+            resolve(palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2])));
+          } catch (error) {
+            console.error('Palette error', error);
+            resolve([]);
+          }
+        };
+        img.onerror = () => resolve([]);
+        img.src = url;
       });
     }
 
-    function renderTablePlaceholder() {
-      document.getElementById('table-body').innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-slate-400">Importez une base pour afficher les données.</td></tr>';
-      document.getElementById('table-count').textContent = '';
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
 
-    function resetFilters() {
-      state.filters = { dateStart: '', dateEnd: '', partenaire: [], offre: [], etat_pass: [], region: [], categorie: [] };
-      document.getElementById('filter-date-start').value = '';
-      document.getElementById('filter-date-end').value = '';
-      populateFilterOptions();
-      applyFilters({ debounce: false });
-    }
-
-    function persistFilters() {
-      try {
-        localStorage.setItem('passjeunes_filters', JSON.stringify(state.filters));
-      } catch (error) {
-        console.warn('Impossible de sauvegarder les filtres', error);
-      }
-    }
-
-    function persistPalette() {
-      try {
-        localStorage.setItem('passjeunes_palette', state.palette.join(','));
-      } catch (error) {
-        console.warn('Impossible de sauvegarder la palette', error);
-      }
-    }
-
-    function persistSmartSettings() {
-      try {
-        localStorage.setItem('passjeunes_smart', JSON.stringify(state.smart));
-      } catch (error) {
-        console.warn('Impossible de sauvegarder les paramètres d’analyse', error);
-      }
+    function readFileAsDataUrl(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
     }
 
     function attachEvents() {
-      const chromeGuide = document.getElementById('open-chrome-guide');
-      if (chromeGuide) {
-        chromeGuide.addEventListener('click', (event) => {
-          event.preventDefault();
-          alert('Pour lancer le dashboard dans Chrome :\n1. Téléchargez ou clonez ce fichier.\n2. Double-cliquez sur index.html ou utilisez Ctrl+O (Cmd+O sur Mac) dans Chrome puis sélectionnez le fichier.\n3. Toutes les fonctionnalités fonctionnent ensuite hors-ligne.');
-        });
-      }
-
-      document.getElementById('import-btn').addEventListener('click', () => {
-        document.getElementById('file-input').click();
-      });
-      document.getElementById('file-input').addEventListener('change', (event) => {
+      document.getElementById('data-input').addEventListener('change', event => {
         const file = event.target.files[0];
-        loadFile(file);
-        event.target.value = '';
+        if (!file) return;
+        handleDataFile(file);
       });
 
-      ['filter-date-start', 'filter-date-end'].forEach((id) => {
-        document.getElementById(id).addEventListener('change', (event) => {
-          state.filters[id === 'filter-date-start' ? 'dateStart' : 'dateEnd'] = event.target.value;
-          applyFilters();
-        });
+      ['filter-date-start', 'filter-date-end'].forEach(id => {
+        document.getElementById(id).addEventListener('change', debounce(applyFilters, 200));
+      });
+      document.getElementById('filter-partenaires').addEventListener('change', debounce(applyFilters, 200));
+      document.getElementById('filter-offres').addEventListener('change', debounce(applyFilters, 200));
+
+      document.getElementById('reset-filters').addEventListener('click', () => {
+        populateFilters();
+        applyFilters();
       });
 
-      [
-        ['filter-partenaire', 'partenaire'],
-        ['filter-offre', 'offre'],
-        ['filter-etat', 'etat_pass'],
-        ['filter-region', 'region'],
-        ['filter-categorie', 'categorie']
-      ].forEach(([id, key]) => {
-        document.getElementById(id).addEventListener('change', (event) => {
-          const selected = Array.from(event.target.selectedOptions).map((option) => option.value);
-          state.filters[key] = selected;
-          applyFilters();
-        });
+      document.getElementById('export-table').addEventListener('click', exportTableCsv);
+      document.querySelectorAll('.export-chart').forEach(btn => {
+        btn.addEventListener('click', () => exportChart(btn.dataset.chart));
       });
 
-      document.getElementById('reset-filters').addEventListener('click', (event) => {
-        event.preventDefault();
-        resetFilters();
+      document.getElementById('table-prev').addEventListener('click', () => {
+        state.tablePage = Math.max(0, state.tablePage - 1);
+        renderTables();
+      });
+      document.getElementById('table-next').addEventListener('click', () => {
+        const maxPage = Math.floor((state.filtered.length - 1) / state.tablePageSize);
+        state.tablePage = Math.min(maxPage, state.tablePage + 1);
+        renderTables();
       });
 
-      document.getElementById('smart-period').addEventListener('change', (event) => {
-        state.smart.period = event.target.value;
-        computeSmartAnalysis();
-        renderSmartAnalysis();
-        persistSmartSettings();
-      });
-
-      document.getElementById('smart-dimension').addEventListener('change', (event) => {
-        state.smart.dimension = event.target.value;
-        computeSmartAnalysis();
-        renderSmartAnalysis();
-        persistSmartSettings();
-      });
-
-      document.getElementById('apply-palette').addEventListener('click', () => {
-        const input = document.getElementById('palette-input').value;
-        const colors = input.split(',').map((c) => c.trim()).filter((c) => /^#?[0-9a-fA-F]{6}$/.test(c.replace('#', ''))).map((c) => (c.startsWith('#') ? c : `#${c}`));
-        if (!colors.length) {
-          document.getElementById('palette-status').textContent = 'Palette invalide. Utilisation de la palette par défaut.';
-          state.palette = [...defaultPalette];
-        } else {
-          state.palette = colors;
-          document.getElementById('palette-status').textContent = `${colors.length} couleurs chargées.`;
-        }
-        persistPalette();
-        renderCharts();
-        renderKpis();
-      });
-
-      document.getElementById('export-csv').addEventListener('click', () => downloadCSV(state.filteredData));
-      document.getElementById('export-charts').addEventListener('click', downloadAllCharts);
-      document.getElementById('export-pdf').addEventListener('click', downloadPDF);
-
-      document.querySelectorAll('.top-offres-mode').forEach((button) => {
-        button.addEventListener('click', () => {
-          state.topOffresMode = button.dataset.mode;
-          renderTopModeButtons();
-          renderTopOffresChart();
-        });
-      });
-
-      document.getElementById('mapping-cancel').addEventListener('click', (event) => {
-        event.preventDefault();
-        document.getElementById('mapping-modal').classList.add('hidden');
-      });
-
-      document.getElementById('mapping-apply').addEventListener('click', (event) => {
-        event.preventDefault();
-        const formData = new FormData(document.getElementById('mapping-form'));
-        const manualMap = {};
-        for (const [key, value] of formData.entries()) {
-          manualMap[key] = value;
-        }
-        const requiredMissing = ['partenaire', 'offre', 'etat_pass', 'date_scan'].filter((key) => !manualMap[key]);
-        if (requiredMissing.length) {
-          alert('Merci de sélectionner toutes les colonnes requises.');
-          return;
-        }
-        const requiredValues = ['partenaire', 'offre', 'etat_pass', 'date_scan'].map((key) => manualMap[key]);
-        const duplicates = requiredValues.filter((value, index, array) => value && array.indexOf(value) !== index);
-        if (duplicates.length) {
-          alert('Chaque colonne source ne peut être sélectionnée qu\'une seule fois.');
-          return;
-        }
-        const { success, data, reason } = normalizeColumns(state.originalRows, manualMap);
-        if (!success) {
-          alert('Certaines colonnes restent introuvables: ' + (Array.isArray(reason) ? reason.join(', ') : reason));
-          return;
-        }
-        document.getElementById('mapping-modal').classList.add('hidden');
-        hydrateDataset(data);
-      });
-    }
-
-    function showMappingForm(missingKeys, headers) {
-      const modal = document.getElementById('mapping-modal');
-      const form = document.getElementById('mapping-form');
-      form.innerHTML = '';
-      const expectedLabels = {
-        partenaire: 'Partenaire',
-        offre: "Offre",
-        etat_pass: 'État Pass',
-        date_scan: 'Date de scan',
-        valeur_offre: "Valeur de l'offre (optionnel)",
-        region: 'Région (optionnel)',
-        categorie: 'Catégorie (optionnel)'
-      };
-      const autoMapping = guessAutoMapping(headers);
-      const required = Array.isArray(missingKeys) ? Array.from(new Set([...missingKeys, 'partenaire', 'offre', 'etat_pass', 'date_scan'])) : ['partenaire', 'offre', 'etat_pass', 'date_scan'];
-      ['partenaire', 'offre', 'etat_pass', 'date_scan', 'valeur_offre', 'region', 'categorie'].forEach((key) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'space-y-1';
-        const label = document.createElement('label');
-        label.className = 'block text-sm font-medium text-pass-jeunes-blue';
-        label.textContent = `${expectedLabels[key]}${['valeur_offre', 'region', 'categorie'].includes(key) ? '' : ' *'}`;
-        const select = document.createElement('select');
-        select.name = key;
-        select.className = 'w-full rounded-md border-slate-300';
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = '— Sélectionner —';
-        select.appendChild(emptyOption);
-        headers.forEach((header) => {
-          const option = document.createElement('option');
-          option.value = header;
-          option.textContent = header;
-          if (autoMapping[key] === header) {
-            option.selected = true;
+      document.querySelectorAll('#table-details thead th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (state.tableSort.key === key) {
+            state.tableSort.direction = state.tableSort.direction === 'asc' ? 'desc' : 'asc';
+          } else {
+            state.tableSort.key = key;
+            state.tableSort.direction = 'desc';
           }
-          select.appendChild(option);
+          renderTables();
         });
-        if (!required.includes(key) && !autoMapping[key]) {
-          select.value = '';
-        }
-        wrapper.appendChild(label);
-        wrapper.appendChild(select);
-        form.appendChild(wrapper);
       });
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-    }
 
-    function guessAutoMapping(headers) {
-      const normalizedHeaders = headers.map((header) => ({
-        original: header,
-        normalized: normalizeHeader(header)
-      }));
-      const mapping = {};
-      Object.keys(COLUMN_SYNONYMS).forEach((key) => {
-        const synonyms = COLUMN_SYNONYMS[key];
-        const found = normalizedHeaders.find((h) => synonyms.includes(h.normalized));
-        if (found) {
-          mapping[key] = found.original;
+      document.getElementById('charte-input').addEventListener('change', event => handleCharte(event.target.files));
+
+      document.getElementById('visual-hero').addEventListener('change', event => {
+        state.assignments.hero = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-watermark').addEventListener('change', event => {
+        state.assignments.watermark = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-empty').addEventListener('change', event => {
+        state.assignments.empty = event.target.value || null;
+        updateAssignments();
+      });
+      document.getElementById('visual-section').addEventListener('change', event => {
+        state.assignments.section = event.target.value || null;
+        updateAssignments();
+      });
+
+      document.getElementById('top-offres-more').addEventListener('click', () => {
+        state.topOfferLimit += 20;
+        renderCharts();
+      });
+      document.getElementById('top-offres-all').addEventListener('click', () => {
+        state.topOfferLimit = 1_000;
+        renderCharts();
+      });
+      document.getElementById('top-offres-search').addEventListener('input', event => {
+        state.topOfferSearch = event.target.value;
+        state.topOfferLimit = 0;
+        renderCharts();
+      });
+
+      document.querySelectorAll('input[name="time-aggregation"]').forEach(input => {
+        input.addEventListener('change', () => {
+          state.manualAggregation = input.value;
+          state.aggregation = input.value;
+          renderCharts();
+          renderTables();
+        });
+      });
+
+      document.addEventListener('dragenter', event => {
+        event.preventDefault();
+        dragCounter++;
+        document.body.classList.add('dragging');
+      });
+      document.addEventListener('dragover', event => {
+        event.preventDefault();
+      });
+      document.addEventListener('dragleave', event => {
+        event.preventDefault();
+        dragCounter = Math.max(0, dragCounter - 1);
+        if (dragCounter === 0) {
+          document.body.classList.remove('dragging');
         }
       });
-      return mapping;
-    }
-
-    function filterNonDate(row) {
-      const partenaires = new Set(state.filters.partenaire);
-      const offres = new Set(state.filters.offre);
-      const etats = new Set(state.filters.etat_pass);
-      const regions = new Set(state.filters.region);
-      const categories = new Set(state.filters.categorie);
-      if (partenaires.size && !partenaires.has(row.partenaire)) return false;
-      if (offres.size && !offres.has(row.offre)) return false;
-      if (etats.size && !etats.has(row.etat_pass)) return false;
-      const regionValue = row.region || '';
-      const categorieValue = row.categorie || '';
-      if (regions.size && !regions.has(regionValue)) return false;
-      if (categories.size && !categories.has(categorieValue)) return false;
-      return true;
-    }
-
-    function formatNumber(value) {
-      return new Intl.NumberFormat('fr-FR').format(value || 0);
-    }
-
-    function formatCurrency(value) {
-      return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
-    }
-
-    function formatVariation(value) {
-      if (value === null || value === undefined || Number.isNaN(value)) {
-        return '<span class="text-slate-400">—</span>';
-      }
-      if (!Number.isFinite(value)) {
-        return '<span class="text-pass-jeunes-green font-semibold">↑ +∞%</span>';
-      }
-      const direction = value > 0 ? '↑' : value < 0 ? '↓' : '→';
-      const color = value > 0 ? 'text-pass-jeunes-green' : value < 0 ? 'text-red-500' : 'text-slate-500';
-      const formatted = `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-      return `<span class="${color} font-semibold">${direction} ${formatted}</span>`;
-    }
-
-    function formatVariationPlain(value) {
-      if (value === null || value === undefined || Number.isNaN(value)) {
-        return '—';
-      }
-      if (!Number.isFinite(value)) {
-        return '+∞%';
-      }
-      const formatted = `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
-      return formatted;
-    }
-
-    function localeSort(a, b) {
-      return a.localeCompare(b, 'fr', { sensitivity: 'base' });
-    }
-
-    function escapeHtml(str) {
-      return String(str || '').replace(/[&<>"']/g, (match) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match));
-    }
-
-    function getColor(i) {
-      if (!state.palette || !state.palette.length) {
-        state.palette = [...defaultPalette];
-      }
-      return state.palette[i % state.palette.length];
-    }
-
-    function tinyColor(color) {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = color;
-      const computed = ctx.fillStyle;
-      const { r, g, b } = hexToRgb(computed);
-      return {
-        setAlpha(alpha) {
-          return {
-            toRgbString() {
-              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-            }
-          };
-        },
-        toRgbString() {
-          return `rgba(${r}, ${g}, ${b}, 1)`;
+      document.addEventListener('drop', event => {
+        event.preventDefault();
+        dragCounter = 0;
+        document.body.classList.remove('dragging');
+        const files = event.dataTransfer?.files;
+        if (files && files.length) {
+          const file = files[0];
+          if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
+            handleCharte(files);
+          } else {
+            handleDataFile(file);
+          }
         }
-      };
+      });
+
+      const ro = new ResizeObserver(debounce(() => {
+        refreshCharts();
+      }, 250));
+      document.querySelectorAll('.chart-wrapper').forEach(wrapper => ro.observe(wrapper));
     }
 
-    function hexToRgb(hex) {
-      let sanitized = hex.replace('#', '');
-      if (sanitized.length === 3) {
-        sanitized = sanitized.split('').map((char) => char + char).join('');
-      }
-      const bigint = parseInt(sanitized, 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      return { r, g, b };
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      loadInitialPreferences();
+    function init() {
       attachEvents();
-      renderTopModeButtons();
-      renderSmartAnalysis();
-      renderTablePlaceholder();
-    });
+      renderPalettePreview();
+      updateAssignments();
+      loadDefaultWorkbook();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
