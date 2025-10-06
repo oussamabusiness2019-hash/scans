@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>scans2025 Dashboard</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "pass-jeunes-blue": "#1C2C5B",
+            "pass-jeunes-green": "#3CB371",
+            "pass-jeunes-yellow": "#F5C842",
+            "pass-jeunes-pink": "#F57EA8",
+            "pass-jeunes-purple": "#6C5CE7"
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/customParseFormat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-3nV8vLwawx2UY8ailqXFz3vGN9VOGBev5nYeD1yfknhk+aoCA8DmF5asJ5AZt0pOEtpJR/YWZLxE+nobBOU9AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    ::selection { background: rgba(28,44,91,0.2); }
+    .scrollbar-thin { scrollbar-width: thin; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background-color: rgba(28,44,91,0.4); border-radius: 999px; }
+    .chip { display: inline-flex; align-items: center; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background-color: #f1f5f9; color: #475569; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen">
+  <header class="bg-white shadow sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <h1 class="text-2xl font-bold tracking-tight text-pass-jeunes-blue">scans2025</h1>
+      <div class="flex items-center space-x-3 text-sm text-slate-600">
+        <a id="open-chrome-guide" href="#" class="inline-flex items-center space-x-2 text-pass-jeunes-blue hover:text-pass-jeunes-green font-medium">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 102 0v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+          <span>Ouvrir dans Chrome ?</span>
+        </a>
+        <span class="hidden sm:block">Tableau de bord Pass Jeunes</span>
+        <span class="inline-flex items-center px-3 py-1 rounded-full bg-pass-jeunes-blue text-white text-xs uppercase tracking-wide">Client-side only</span>
+      </div>
+    </div>
+  </header>
+  <div class="flex">
+    <aside class="w-full max-w-xs bg-white shadow-lg min-h-screen p-6 space-y-8">
+      <div>
+        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2">Importer des données</h2>
+        <p class="text-sm text-slate-500 mb-3">Chargez un fichier CSV ou Excel conforme à <em>scans2025.xlsx</em>.</p>
+        <div class="space-y-3">
+          <input id="file-input" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
+          <button id="import-btn" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-pass-jeunes-blue text-white font-semibold hover:bg-opacity-90 transition">Importer une base (CSV/Excel)</button>
+          <p id="import-status" class="text-xs text-slate-500"></p>
+        </div>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2 flex items-center justify-between">Filtres
+          <button id="reset-filters" class="text-xs text-pass-jeunes-blue hover:underline">Réinitialiser</button>
+        </h2>
+        <div class="space-y-4" id="filters-form">
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Plage de dates</label>
+            <div class="flex space-x-2">
+              <input type="date" id="filter-date-start" class="w-1/2 rounded-md border-slate-300" />
+              <input type="date" id="filter-date-end" class="w-1/2 rounded-md border-slate-300" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Partenaires</label>
+            <select id="filter-partenaire" class="w-full rounded-md border-slate-300" multiple></select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Offres</label>
+            <select id="filter-offre" class="w-full rounded-md border-slate-300" multiple></select>
+          </div>
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">États Pass</label>
+            <select id="filter-etat" class="w-full rounded-md border-slate-300" multiple></select>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold text-pass-jeunes-blue mb-2">Palette Pass Jeunes (y)</h2>
+        <p class="text-xs text-slate-500 mb-2">Collez les codes HEX séparés par des virgules à partir de l'identité visuelle Pass Jeunes.</p>
+        <textarea id="palette-input" class="w-full h-24 rounded-md border-slate-300 text-xs p-2" placeholder="#1C2C5B,#3CB371,#F5C842,#F57EA8,#6C5CE7"></textarea>
+        <button id="apply-palette" class="mt-2 w-full inline-flex items-center justify-center px-3 py-2 rounded-md border border-pass-jeunes-blue text-pass-jeunes-blue text-sm font-semibold hover:bg-pass-jeunes-blue hover:text-white transition">Appliquer la palette</button>
+        <p id="palette-status" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+      <div class="space-y-2">
+        <button id="export-csv" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-green text-white font-semibold hover:bg-opacity-90">Exporter données filtrées (CSV)</button>
+        <button id="export-charts" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-yellow text-slate-900 font-semibold hover:bg-opacity-90">Exporter chaque graphique (PNG)</button>
+        <button id="export-pdf" class="w-full px-4 py-2 rounded-md bg-pass-jeunes-pink text-white font-semibold hover:bg-opacity-90">Exporter mini-rapport (PDF)</button>
+      </div>
+    </aside>
+    <main class="flex-1 p-6 space-y-8">
+      <section>
+        <h2 class="text-xl font-semibold text-pass-jeunes-blue mb-4">Indicateurs clés</h2>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="kpi-container">
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Nombre total de scans</h3>
+            <p id="kpi-total-scans" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
+          </div>
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Offres distinctes</h3>
+            <p id="kpi-offres" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
+          </div>
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Partenaires distincts</h3>
+            <p id="kpi-partenaires" class="text-3xl font-bold mt-2 text-pass-jeunes-blue">-</p>
+          </div>
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Répartition par État Pass</h3>
+            <div id="kpi-etat" class="flex flex-wrap gap-2 mt-2"></div>
+          </div>
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Croissance MoM des scans</h3>
+            <p id="kpi-mom" class="text-2xl font-semibold mt-2">-</p>
+          </div>
+          <div class="kpi-card bg-white rounded-xl shadow p-4">
+            <h3 class="text-xs uppercase tracking-wide text-slate-500">Valeur totale & moyenne</h3>
+            <p id="kpi-valeurs" class="text-2xl font-semibold mt-2">-</p>
+          </div>
+        </div>
+      </section>
+      <section class="space-y-6">
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-pass-jeunes-blue">Tendance des scans par mois</h3>
+          </div>
+          <canvas id="chart-trend" height="120"></canvas>
+        </div>
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-pass-jeunes-blue">Top 10 offres scannées</h3>
+              <div class="flex items-center space-x-2 text-xs bg-slate-100 rounded-full px-2 py-1">
+                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="current">Mois courant</button>
+                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="global">Global</button>
+                <button class="top-offres-mode px-2 py-1 rounded-full" data-mode="filtered">Période filtrée</button>
+              </div>
+            </div>
+            <canvas id="chart-top-offres" height="200"></canvas>
+          </div>
+          <div class="bg-white rounded-xl shadow p-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-pass-jeunes-blue">Top 10 partenaires</h3>
+            </div>
+            <canvas id="chart-top-partenaires" height="200"></canvas>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-pass-jeunes-blue">Scans par État Pass</h3>
+          </div>
+          <canvas id="chart-etat" height="160"></canvas>
+        </div>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-pass-jeunes-blue">Détail des scans</h3>
+          <span id="table-count" class="text-xs text-slate-500"></span>
+        </div>
+        <div class="overflow-auto scrollbar-thin" style="max-height: 420px;">
+          <table class="min-w-full text-sm" id="data-table">
+            <thead class="bg-slate-50 text-slate-600 uppercase text-xs">
+              <tr>
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">Partenaire</th>
+                <th class="px-4 py-3 text-left">Offre</th>
+                <th class="px-4 py-3 text-left">État Pass</th>
+                <th class="px-4 py-3 text-right">Valeur</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100" id="table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div id="mapping-modal" class="fixed inset-0 bg-slate-900 bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full space-y-4">
+      <div>
+        <h3 class="text-lg font-semibold text-pass-jeunes-blue">Associer les colonnes</h3>
+        <p class="text-sm text-slate-500">Certaines colonnes n'ont pas été reconnues. Associez-les manuellement.</p>
+      </div>
+      <form id="mapping-form" class="space-y-4"></form>
+      <div class="flex items-center justify-end space-x-3">
+        <button id="mapping-cancel" class="px-4 py-2 rounded-md border border-slate-300 text-slate-600">Annuler</button>
+        <button id="mapping-apply" class="px-4 py-2 rounded-md bg-pass-jeunes-blue text-white font-semibold">Valider</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      originalRows: [],
+      rawData: [],
+      filteredData: [],
+      uniqueValues: { partenaire: [], offre: [], etat_pass: [] },
+      filters: { dateStart: '', dateEnd: '', partenaire: [], offre: [], etat_pass: [] },
+      palette: [],
+      charts: {},
+      debounceTimer: null,
+      lastHeaders: [],
+      mappingRequired: false,
+      topOffresMode: 'filtered'
+    };
+
+    const defaultPalette = ['#1C2C5B', '#3CB371', '#F5C842', '#F57EA8', '#6C5CE7', '#00A6FB', '#FF8966', '#FFD166'];
+    const COLUMN_SYNONYMS = {
+      partenaire: ['partenaire', 'le partenaire', 'partner', 'partenaire_nom', 'partenaire_name', 'nom partenaire'],
+      offre: ['offre', "l'offre", 'offer', 'libelle_offre', 'libellé offre'],
+      etat_pass: ['etat pass', 'etat', 'etat_pass', 'statut_pass', 'statut', 'etat du pass'],
+      date_scan: ['date_scan', 'date de scan', 'date', 'scan_date', 'date_scann', 'date scan'],
+      valeur_offre: ['valeur_offre', "valeur de l'offre", 'valeur', 'amount', 'montant', 'valeur offre']
+    };
+
+    dayjs.extend(window.dayjs_plugin_customParseFormat);
+
+    function loadInitialPreferences() {
+      try {
+        const savedPalette = localStorage.getItem('passjeunes_palette');
+        if (savedPalette) {
+          state.palette = savedPalette.split(',').map((c) => c.trim()).filter(Boolean);
+          document.getElementById('palette-input').value = savedPalette;
+        }
+        const savedFilters = localStorage.getItem('passjeunes_filters');
+        if (savedFilters) {
+          const parsed = JSON.parse(savedFilters);
+          state.filters = { ...state.filters, ...parsed };
+          document.getElementById('filter-date-start').value = parsed.dateStart || '';
+          document.getElementById('filter-date-end').value = parsed.dateEnd || '';
+        }
+      } catch (error) {
+        console.warn('Préférences non chargées', error);
+      }
+      if (!state.palette.length) {
+        state.palette = [...defaultPalette];
+      }
+    }
+
+    function loadFile(file) {
+      if (!file) return;
+      document.getElementById('import-status').textContent = 'Lecture du fichier en cours…';
+      parseCsvXlsx(file)
+        .then((rows) => {
+          if (!rows.length) {
+            throw new Error('Le fichier est vide.');
+          }
+          state.originalRows = rows;
+          state.lastHeaders = Object.keys(rows[0] || {});
+          const { success, data, reason } = normalizeColumns(rows);
+          if (success) {
+            state.mappingRequired = false;
+            document.getElementById('mapping-modal').classList.add('hidden');
+            hydrateDataset(data);
+            document.getElementById('import-status').textContent = `${rows.length} lignes importées.`;
+          } else {
+            state.mappingRequired = true;
+            showMappingForm(reason || 'Colonnes non reconnues.', state.lastHeaders);
+            document.getElementById('import-status').textContent = 'Colonnes à associer manuellement.';
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+          document.getElementById('import-status').textContent = `Erreur: ${error.message}`;
+        });
+    }
+
+    function parseCsvXlsx(file) {
+      const extension = file.name.split('.').pop().toLowerCase();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Impossible de lire le fichier.'));
+        if (extension === 'csv') {
+          reader.onload = () => {
+            const text = reader.result;
+            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+            if (parsed.errors.length) {
+              console.warn(parsed.errors);
+            }
+            resolve(parsed.data);
+          };
+          reader.readAsText(file, 'utf-8');
+        } else if (extension === 'xlsx' || extension === 'xls') {
+          reader.onload = () => {
+            try {
+              const data = new Uint8Array(reader.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const firstSheet = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheet];
+              const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+              resolve(json);
+            } catch (err) {
+              reject(new Error('Impossible de parser le fichier Excel.'));
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          reject(new Error('Format de fichier non supporté.'));
+        }
+      });
+    }
+
+    function normalizeHeader(header) {
+      return String(header || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/(^_|_$)/g, '')
+        .replace(/__+/g, '_');
+    }
+
+    function normalizeColumns(rows, manualMap = null) {
+      if (!rows || !rows.length) return { success: false, reason: 'Aucune donnée.' };
+      const expected = ['partenaire', 'offre', 'etat_pass', 'date_scan'];
+      const optional = ['valeur_offre'];
+      const mapping = {};
+      const headers = Object.keys(rows[0]);
+      const headerNormalized = headers.map((h) => normalizeHeader(h));
+      expected.concat(optional).forEach((key) => {
+        mapping[key] = null;
+      });
+
+      const assignFromSynonyms = (targetKey) => {
+        const syns = COLUMN_SYNONYMS[targetKey] || [];
+        for (let i = 0; i < headerNormalized.length; i++) {
+          if (syns.includes(headerNormalized[i])) {
+            mapping[targetKey] = headers[i];
+            break;
+          }
+        }
+      };
+
+      expected.forEach(assignFromSynonyms);
+      optional.forEach(assignFromSynonyms);
+
+      if (manualMap) {
+        Object.keys(manualMap).forEach((key) => {
+          if (manualMap[key]) {
+            mapping[key] = manualMap[key];
+          }
+        });
+      }
+
+      const missing = expected.filter((key) => !mapping[key]);
+      if (missing.length) {
+        return { success: false, reason: missing };
+      }
+
+      const normalizedRows = rows.map((row) => {
+        const partenaire = String(row[mapping.partenaire] || '').trim();
+        const offre = String(row[mapping.offre] || '').trim();
+        const etat_pass = String(row[mapping.etat_pass] || '').trim();
+        const dateRaw = row[mapping.date_scan];
+        const valeurRaw = mapping.valeur_offre ? row[mapping.valeur_offre] : '';
+        const parsedDate = parseDate(dateRaw);
+        return {
+          partenaire,
+          offre,
+          etat_pass,
+          date_scan: parsedDate ? parsedDate.toISOString() : null,
+          valeur_offre: parseNumeric(valeurRaw),
+          _date_display: parsedDate ? parsedDate : null,
+          _date_raw: dateRaw
+        };
+      }).filter((r) => r.partenaire || r.offre || r.etat_pass || r.date_scan);
+
+      return { success: true, data: normalizedRows };
+    }
+
+    function parseDate(value) {
+      if (!value) return null;
+      if (value instanceof Date) {
+        return dayjs(value);
+      }
+      const str = String(value).trim();
+      if (!str) return null;
+      const formats = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY', 'DD-MM-YYYY', 'YYYY/MM/DD', 'DD.MM.YYYY', 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DD HH:mm:ss', 'D MMM YYYY', 'MMM D YYYY', 'D/M/YYYY', 'M/D/YYYY'];
+      for (const fmt of formats) {
+        const parsed = dayjs(str, fmt, true);
+        if (parsed.isValid()) {
+          return parsed;
+        }
+      }
+      const fallback = dayjs(str);
+      return fallback.isValid() ? fallback : null;
+    }
+
+    function parseNumeric(value) {
+      if (value === undefined || value === null || value === '') return null;
+      const numeric = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9,.-]+/g, '').replace(',', '.'));
+      return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    function hydrateDataset(data) {
+      state.rawData = data.filter((row) => row.date_scan);
+      computeUniqueValues();
+      applyFilters();
+    }
+
+    function computeUniqueValues() {
+      const partenaires = new Set();
+      const offres = new Set();
+      const etats = new Set();
+      state.rawData.forEach((row) => {
+        if (row.partenaire) partenaires.add(row.partenaire);
+        if (row.offre) offres.add(row.offre);
+        if (row.etat_pass) etats.add(row.etat_pass);
+      });
+      state.uniqueValues.partenaire = Array.from(partenaires).sort(localeSort);
+      state.uniqueValues.offre = Array.from(offres).sort(localeSort);
+      state.uniqueValues.etat_pass = Array.from(etats).sort(localeSort);
+      populateFilterOptions();
+    }
+
+    function populateFilterOptions() {
+      const selectPartenaire = document.getElementById('filter-partenaire');
+      const selectOffre = document.getElementById('filter-offre');
+      const selectEtat = document.getElementById('filter-etat');
+      const createOptions = (select, values, selected) => {
+        select.innerHTML = '';
+        values.forEach((value) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = value;
+          if (selected.includes(value)) option.selected = true;
+          select.appendChild(option);
+        });
+      };
+      createOptions(selectPartenaire, state.uniqueValues.partenaire, state.filters.partenaire);
+      createOptions(selectOffre, state.uniqueValues.offre, state.filters.offre);
+      createOptions(selectEtat, state.uniqueValues.etat_pass, state.filters.etat_pass);
+    }
+
+    function applyFilters(options = { debounce: true, ignoreDate: false }) {
+      if (options.debounce) {
+        clearTimeout(state.debounceTimer);
+        state.debounceTimer = setTimeout(() => applyFilters({ debounce: false, ignoreDate: options.ignoreDate }), 120);
+        return;
+      }
+      const start = state.filters.dateStart ? dayjs(state.filters.dateStart) : null;
+      const end = state.filters.dateEnd ? dayjs(state.filters.dateEnd) : null;
+      const partenaires = new Set(state.filters.partenaire);
+      const offres = new Set(state.filters.offre);
+      const etats = new Set(state.filters.etat_pass);
+      state.filteredData = state.rawData.filter((row) => {
+        const date = row.date_scan ? dayjs(row.date_scan) : null;
+        if (!options.ignoreDate) {
+          if (start && (!date || date.isBefore(start, 'day'))) return false;
+          if (end && (!date || date.isAfter(end, 'day'))) return false;
+        }
+        if (partenaires.size && !partenaires.has(row.partenaire)) return false;
+        if (offres.size && !offres.has(row.offre)) return false;
+        if (etats.size && !etats.has(row.etat_pass)) return false;
+        return true;
+      });
+      computeKpis();
+      renderKpis();
+      renderCharts();
+      renderTable();
+      persistFilters();
+    }
+
+    function groupByMonth(rows) {
+      const buckets = new Map();
+      rows.forEach((row) => {
+        if (!row.date_scan) return;
+        const d = dayjs(row.date_scan);
+        if (!d.isValid()) return;
+        const key = d.format('YYYY-MM');
+        const label = d.format('MMM YYYY');
+        if (!buckets.has(key)) {
+          buckets.set(key, { label, count: 0 });
+        }
+        buckets.get(key).count += 1;
+      });
+      return Array.from(buckets.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([, value]) => value);
+    }
+
+    function groupBy(rows, field) {
+      const buckets = new Map();
+      rows.forEach((row) => {
+        const key = row[field] || 'Non renseigné';
+        if (!buckets.has(key)) {
+          buckets.set(key, { label: key, count: 0 });
+        }
+        buckets.get(key).count += 1;
+      });
+      return Array.from(buckets.values()).sort((a, b) => b.count - a.count);
+    }
+
+    function computeKpis() {
+      state.kpis = {};
+      const filtered = state.filteredData;
+      state.kpis.totalScans = filtered.length;
+      state.kpis.offresDistinctes = new Set(filtered.map((r) => r.offre)).size;
+      state.kpis.partenairesDistincts = new Set(filtered.map((r) => r.partenaire)).size;
+
+      const etatCounts = groupBy(filtered, 'etat_pass');
+      const total = filtered.length || 1;
+      state.kpis.repartitionEtat = etatCounts.map((item) => ({
+        label: item.label,
+        count: item.count,
+        percent: (item.count / total) * 100
+      }));
+
+      const byMonth = groupByMonth(filtered);
+      if (byMonth.length >= 2) {
+        const last = byMonth[byMonth.length - 1].count;
+        const prev = byMonth[byMonth.length - 2].count;
+        const variation = prev === 0 ? 100 : ((last - prev) / prev) * 100;
+        state.kpis.mom = { variation, last, prev };
+      } else {
+        state.kpis.mom = null;
+      }
+
+      const valeurs = filtered.map((r) => r.valeur_offre).filter((v) => v !== null && !Number.isNaN(v));
+      if (valeurs.length) {
+        const sum = valeurs.reduce((acc, val) => acc + val, 0);
+        state.kpis.valeurTotale = sum;
+        state.kpis.valeurMoyenne = sum / valeurs.length;
+      } else {
+        state.kpis.valeurTotale = null;
+        state.kpis.valeurMoyenne = null;
+      }
+    }
+
+    function renderKpis() {
+      document.getElementById('kpi-total-scans').textContent = formatNumber(state.kpis.totalScans || 0);
+      document.getElementById('kpi-offres').textContent = formatNumber(state.kpis.offresDistinctes || 0);
+      document.getElementById('kpi-partenaires').textContent = formatNumber(state.kpis.partenairesDistincts || 0);
+      const etatContainer = document.getElementById('kpi-etat');
+      etatContainer.innerHTML = '';
+      if (state.kpis.repartitionEtat && state.kpis.repartitionEtat.length) {
+        state.kpis.repartitionEtat.forEach((item, index) => {
+          const badge = document.createElement('span');
+          badge.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold';
+          badge.style.backgroundColor = tinyColor(getColor(index)).setAlpha(0.1).toRgbString();
+          badge.style.color = getColor(index);
+          badge.textContent = `${item.label}: ${item.percent.toFixed(1)}%`;
+          etatContainer.appendChild(badge);
+        });
+      } else {
+        const empty = document.createElement('span');
+        empty.className = 'text-xs text-slate-400';
+        empty.textContent = 'Aucune donnée';
+        etatContainer.appendChild(empty);
+      }
+      const momEl = document.getElementById('kpi-mom');
+      if (state.kpis.mom) {
+        const variation = state.kpis.mom.variation;
+        const arrow = variation >= 0 ? '↑' : '↓';
+        const color = variation >= 0 ? 'text-pass-jeunes-green' : 'text-red-500';
+        momEl.className = `text-2xl font-semibold mt-2 ${color}`;
+        momEl.textContent = `${arrow} ${variation.toFixed(1)}%`;
+      } else {
+        momEl.className = 'text-2xl font-semibold mt-2 text-slate-400';
+        momEl.textContent = 'N/A';
+      }
+      const valeursEl = document.getElementById('kpi-valeurs');
+      if (state.kpis.valeurTotale !== null) {
+        valeursEl.className = 'text-2xl font-semibold mt-2 text-pass-jeunes-blue';
+        valeursEl.textContent = `${formatCurrency(state.kpis.valeurTotale)} · ${formatCurrency(state.kpis.valeurMoyenne)}/scan`;
+      } else {
+        valeursEl.className = 'text-2xl font-semibold mt-2 text-slate-400';
+        valeursEl.textContent = 'N/A';
+      }
+    }
+
+    function renderCharts() {
+      renderTrendChart();
+      renderTopOffresChart();
+      renderTopPartenairesChart();
+      renderEtatChart();
+    }
+
+    function renderTrendChart() {
+      const ctx = document.getElementById('chart-trend');
+      const dataByMonth = groupByMonth(state.filteredData);
+      const labels = dataByMonth.map((item) => item.label);
+      const values = dataByMonth.map((item) => item.count);
+      const datasetColor = getColor(0);
+      updateChart('trend', ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Scans',
+              data: values,
+              borderColor: datasetColor,
+              backgroundColor: tinyColor(datasetColor).setAlpha(0.2).toRgbString(),
+              fill: true,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { callback: (value) => formatNumber(value) }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => `${context.parsed.y} scans`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTopOffresChart() {
+      const ctx = document.getElementById('chart-top-offres');
+      let baseData = state.filteredData;
+      if (state.topOffresMode === 'current') {
+        const latest = [...baseData].filter((row) => row.date_scan).sort((a, b) => dayjs(b.date_scan).valueOf() - dayjs(a.date_scan).valueOf())[0];
+        if (latest) {
+          const latestMonth = dayjs(latest.date_scan).format('YYYY-MM');
+          baseData = baseData.filter((row) => dayjs(row.date_scan).format('YYYY-MM') === latestMonth);
+        }
+      } else if (state.topOffresMode === 'global') {
+        baseData = state.rawData.filter((row) => filterNonDate(row));
+      }
+      const grouped = groupBy(baseData, 'offre').slice(0, 10);
+      const labels = grouped.map((g) => g.label);
+      const data = grouped.map((g) => g.count);
+      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.8).toRgbString());
+      updateChart('topOffres', ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Nombre de scans',
+              data,
+              backgroundColor: colors,
+              borderColor: labels.map((_, idx) => getColor(idx)),
+              borderWidth: 1,
+              borderRadius: 8
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: { callback: (value) => formatNumber(value) }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.parsed.x} scans`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTopPartenairesChart() {
+      const ctx = document.getElementById('chart-top-partenaires');
+      const grouped = groupBy(state.filteredData, 'partenaire').slice(0, 10);
+      const labels = grouped.map((g) => g.label);
+      const data = grouped.map((g) => g.count);
+      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.8).toRgbString());
+      updateChart('topPartenaires', ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Scans',
+              data,
+              backgroundColor: colors,
+              borderColor: labels.map((_, idx) => getColor(idx)),
+              borderRadius: 6
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, ticks: { callback: (value) => formatNumber(value) } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y} scans` } }
+          }
+        }
+      });
+    }
+
+    function renderEtatChart() {
+      const ctx = document.getElementById('chart-etat');
+      const grouped = groupBy(state.filteredData, 'etat_pass');
+      const labels = grouped.map((g) => g.label);
+      const data = grouped.map((g) => g.count);
+      const colors = labels.map((_, idx) => tinyColor(getColor(idx)).setAlpha(0.85).toRgbString());
+      updateChart('etat', ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [
+            {
+              data,
+              backgroundColor: colors,
+              borderColor: labels.map((_, idx) => getColor(idx)),
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+    }
+
+    function updateChart(key, canvas, config) {
+      if (state.charts[key]) {
+        state.charts[key].destroy();
+      }
+      state.charts[key] = new Chart(canvas, config);
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      const rows = state.filteredData;
+      const formatter = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+      rows.slice(0, 2000).forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap">${row.date_scan ? dayjs(row.date_scan).format('DD MMM YYYY') : ''}</td>
+          <td class="px-4 py-3">${escapeHtml(row.partenaire)}</td>
+          <td class="px-4 py-3">${escapeHtml(row.offre)}</td>
+          <td class="px-4 py-3">${escapeHtml(row.etat_pass)}</td>
+          <td class="px-4 py-3 text-right">${row.valeur_offre !== null ? formatter.format(row.valeur_offre) : ''}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('table-count').textContent = `${rows.length} lignes affichées`;
+    }
+
+    function downloadCSV(rows) {
+      if (!rows.length) {
+        alert('Aucune donnée à exporter.');
+        return;
+      }
+      const headers = ['partenaire', 'offre', 'etat_pass', 'date_scan', 'valeur_offre'];
+      const csvRows = [headers.join(',')];
+      rows.forEach((row) => {
+        const values = headers.map((header) => {
+          const value = row[header];
+          if (header === 'date_scan' && value) {
+            return `"${dayjs(value).format('YYYY-MM-DD')}"`;
+          }
+          if (value === null || value === undefined) return '""';
+          const str = String(value).replace(/"/g, '""');
+          return `"${str}"`;
+        });
+        csvRows.push(values.join(','));
+      });
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `scans_filtrés_${dayjs().format('YYYYMMDD_HHmm')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function downloadPNG(chart) {
+      const link = document.createElement('a');
+      link.href = chart.toBase64Image();
+      link.download = `${chart.canvas.id}_${dayjs().format('YYYYMMDD_HHmmss')}.png`;
+      link.click();
+    }
+
+    async function downloadPDF() {
+      if (!state.filteredData.length) {
+        alert('Aucune donnée pour le rapport.');
+        return;
+      }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      let y = 40;
+      doc.setFontSize(18);
+      doc.setTextColor(28, 44, 91);
+      doc.text('Pass Jeunes — Rapport scans2025', 40, y);
+      y += 30;
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Généré le ${dayjs().format('DD/MM/YYYY HH:mm')}`, 40, y);
+      y += 20;
+      doc.setFontSize(12);
+      doc.setTextColor(28, 44, 91);
+      const kpis = [
+        `Scans: ${formatNumber(state.kpis.totalScans || 0)}`,
+        `Offres distinctes: ${formatNumber(state.kpis.offresDistinctes || 0)}`,
+        `Partenaires distincts: ${formatNumber(state.kpis.partenairesDistincts || 0)}`
+      ];
+      if (state.kpis.mom) {
+        kpis.push(`Croissance MoM: ${state.kpis.mom.variation.toFixed(1)}%`);
+      }
+      if (state.kpis.valeurTotale !== null) {
+        kpis.push(`Valeur totale: ${formatCurrency(state.kpis.valeurTotale)}`);
+        kpis.push(`Valeur moyenne: ${formatCurrency(state.kpis.valeurMoyenne)}`);
+      }
+      doc.text(kpis.join('\n'), 40, y);
+      y += kpis.length * 16 + 10;
+
+      const charts = ['chart-trend', 'chart-top-offres', 'chart-top-partenaires', 'chart-etat'];
+      for (const chartId of charts) {
+        const chartInstance = state.charts[getChartKey(chartId)];
+        if (!chartInstance) continue;
+        const image = chartInstance.toBase64Image();
+        const imgProps = doc.getImageProperties(image);
+        const pdfWidth = doc.internal.pageSize.getWidth() - 80;
+        const ratio = pdfWidth / imgProps.width;
+        const pdfHeight = imgProps.height * ratio;
+        if (y + pdfHeight > doc.internal.pageSize.getHeight() - 40) {
+          doc.addPage();
+          y = 40;
+        }
+        doc.addImage(image, 'PNG', 40, y, pdfWidth, pdfHeight);
+        y += pdfHeight + 20;
+      }
+      doc.save(`rapport_scans_${dayjs().format('YYYYMMDD_HHmm')}.pdf`);
+    }
+
+    function getChartKey(canvasId) {
+      switch (canvasId) {
+        case 'chart-trend':
+          return 'trend';
+        case 'chart-top-offres':
+          return 'topOffres';
+        case 'chart-top-partenaires':
+          return 'topPartenaires';
+        case 'chart-etat':
+          return 'etat';
+        default:
+          return canvasId;
+      }
+    }
+
+    function downloadAllCharts() {
+      Object.values(state.charts).forEach((chart) => {
+        downloadPNG(chart);
+      });
+    }
+
+    function renderTopModeButtons() {
+      document.querySelectorAll('.top-offres-mode').forEach((btn) => {
+        if (btn.dataset.mode === state.topOffresMode) {
+          btn.classList.add('bg-pass-jeunes-blue', 'text-white');
+        } else {
+          btn.classList.remove('bg-pass-jeunes-blue', 'text-white');
+        }
+      });
+    }
+
+    function renderTablePlaceholder() {
+      document.getElementById('table-body').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-sm text-slate-400">Importez une base pour afficher les données.</td></tr>';
+      document.getElementById('table-count').textContent = '';
+    }
+
+    function resetFilters() {
+      state.filters = { dateStart: '', dateEnd: '', partenaire: [], offre: [], etat_pass: [] };
+      document.getElementById('filter-date-start').value = '';
+      document.getElementById('filter-date-end').value = '';
+      populateFilterOptions();
+      applyFilters({ debounce: false });
+    }
+
+    function persistFilters() {
+      try {
+        localStorage.setItem('passjeunes_filters', JSON.stringify(state.filters));
+      } catch (error) {
+        console.warn('Impossible de sauvegarder les filtres', error);
+      }
+    }
+
+    function persistPalette() {
+      try {
+        localStorage.setItem('passjeunes_palette', state.palette.join(','));
+      } catch (error) {
+        console.warn('Impossible de sauvegarder la palette', error);
+      }
+    }
+
+    function attachEvents() {
+      const chromeGuide = document.getElementById('open-chrome-guide');
+      if (chromeGuide) {
+        chromeGuide.addEventListener('click', (event) => {
+          event.preventDefault();
+          alert('Pour lancer le dashboard dans Chrome :\n1. Téléchargez ou clonez ce fichier.\n2. Double-cliquez sur index.html ou utilisez Ctrl+O (Cmd+O sur Mac) dans Chrome puis sélectionnez le fichier.\n3. Toutes les fonctionnalités fonctionnent ensuite hors-ligne.');
+        });
+      }
+
+      document.getElementById('import-btn').addEventListener('click', () => {
+        document.getElementById('file-input').click();
+      });
+      document.getElementById('file-input').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        loadFile(file);
+        event.target.value = '';
+      });
+
+      ['filter-date-start', 'filter-date-end'].forEach((id) => {
+        document.getElementById(id).addEventListener('change', (event) => {
+          state.filters[id === 'filter-date-start' ? 'dateStart' : 'dateEnd'] = event.target.value;
+          applyFilters();
+        });
+      });
+
+      [['filter-partenaire', 'partenaire'], ['filter-offre', 'offre'], ['filter-etat', 'etat_pass']].forEach(([id, key]) => {
+        document.getElementById(id).addEventListener('change', (event) => {
+          const selected = Array.from(event.target.selectedOptions).map((option) => option.value);
+          state.filters[key] = selected;
+          applyFilters();
+        });
+      });
+
+      document.getElementById('reset-filters').addEventListener('click', (event) => {
+        event.preventDefault();
+        resetFilters();
+      });
+
+      document.getElementById('apply-palette').addEventListener('click', () => {
+        const input = document.getElementById('palette-input').value;
+        const colors = input.split(',').map((c) => c.trim()).filter((c) => /^#?[0-9a-fA-F]{6}$/.test(c.replace('#', ''))).map((c) => (c.startsWith('#') ? c : `#${c}`));
+        if (!colors.length) {
+          document.getElementById('palette-status').textContent = 'Palette invalide. Utilisation de la palette par défaut.';
+          state.palette = [...defaultPalette];
+        } else {
+          state.palette = colors;
+          document.getElementById('palette-status').textContent = `${colors.length} couleurs chargées.`;
+        }
+        persistPalette();
+        renderCharts();
+        renderKpis();
+      });
+
+      document.getElementById('export-csv').addEventListener('click', () => downloadCSV(state.filteredData));
+      document.getElementById('export-charts').addEventListener('click', downloadAllCharts);
+      document.getElementById('export-pdf').addEventListener('click', downloadPDF);
+
+      document.querySelectorAll('.top-offres-mode').forEach((button) => {
+        button.addEventListener('click', () => {
+          state.topOffresMode = button.dataset.mode;
+          renderTopModeButtons();
+          renderTopOffresChart();
+        });
+      });
+
+      document.getElementById('mapping-cancel').addEventListener('click', (event) => {
+        event.preventDefault();
+        document.getElementById('mapping-modal').classList.add('hidden');
+      });
+
+      document.getElementById('mapping-apply').addEventListener('click', (event) => {
+        event.preventDefault();
+        const formData = new FormData(document.getElementById('mapping-form'));
+        const manualMap = {};
+        for (const [key, value] of formData.entries()) {
+          manualMap[key] = value;
+        }
+        const requiredMissing = ['partenaire', 'offre', 'etat_pass', 'date_scan'].filter((key) => !manualMap[key]);
+        if (requiredMissing.length) {
+          alert('Merci de sélectionner toutes les colonnes requises.');
+          return;
+        }
+        const requiredValues = ['partenaire', 'offre', 'etat_pass', 'date_scan'].map((key) => manualMap[key]);
+        const duplicates = requiredValues.filter((value, index, array) => value && array.indexOf(value) !== index);
+        if (duplicates.length) {
+          alert('Chaque colonne source ne peut être sélectionnée qu\'une seule fois.');
+          return;
+        }
+        const { success, data, reason } = normalizeColumns(state.originalRows, manualMap);
+        if (!success) {
+          alert('Certaines colonnes restent introuvables: ' + (Array.isArray(reason) ? reason.join(', ') : reason));
+          return;
+        }
+        document.getElementById('mapping-modal').classList.add('hidden');
+        hydrateDataset(data);
+      });
+    }
+
+    function showMappingForm(missingKeys, headers) {
+      const modal = document.getElementById('mapping-modal');
+      const form = document.getElementById('mapping-form');
+      form.innerHTML = '';
+      const expectedLabels = {
+        partenaire: 'Partenaire',
+        offre: "Offre",
+        etat_pass: 'État Pass',
+        date_scan: 'Date de scan',
+        valeur_offre: "Valeur de l'offre (optionnel)"
+      };
+      const autoMapping = guessAutoMapping(headers);
+      const required = Array.isArray(missingKeys) ? Array.from(new Set([...missingKeys, 'partenaire', 'offre', 'etat_pass', 'date_scan'])) : ['partenaire', 'offre', 'etat_pass', 'date_scan'];
+      ['partenaire', 'offre', 'etat_pass', 'date_scan', 'valeur_offre'].forEach((key) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'space-y-1';
+        const label = document.createElement('label');
+        label.className = 'block text-sm font-medium text-pass-jeunes-blue';
+        label.textContent = `${expectedLabels[key]}${key === 'valeur_offre' ? '' : ' *'}`;
+        const select = document.createElement('select');
+        select.name = key;
+        select.className = 'w-full rounded-md border-slate-300';
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '— Sélectionner —';
+        select.appendChild(emptyOption);
+        headers.forEach((header) => {
+          const option = document.createElement('option');
+          option.value = header;
+          option.textContent = header;
+          if (autoMapping[key] === header) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+        if (!required.includes(key) && !autoMapping[key]) {
+          select.value = '';
+        }
+        wrapper.appendChild(label);
+        wrapper.appendChild(select);
+        form.appendChild(wrapper);
+      });
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function guessAutoMapping(headers) {
+      const normalizedHeaders = headers.map((header) => ({
+        original: header,
+        normalized: normalizeHeader(header)
+      }));
+      const mapping = {};
+      Object.keys(COLUMN_SYNONYMS).forEach((key) => {
+        const synonyms = COLUMN_SYNONYMS[key];
+        const found = normalizedHeaders.find((h) => synonyms.includes(h.normalized));
+        if (found) {
+          mapping[key] = found.original;
+        }
+      });
+      return mapping;
+    }
+
+    function filterNonDate(row) {
+      const partenaires = new Set(state.filters.partenaire);
+      const offres = new Set(state.filters.offre);
+      const etats = new Set(state.filters.etat_pass);
+      if (partenaires.size && !partenaires.has(row.partenaire)) return false;
+      if (offres.size && !offres.has(row.offre)) return false;
+      if (etats.size && !etats.has(row.etat_pass)) return false;
+      return true;
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat('fr-FR').format(value || 0);
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value || 0);
+    }
+
+    function localeSort(a, b) {
+      return a.localeCompare(b, 'fr', { sensitivity: 'base' });
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, (match) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match] || match));
+    }
+
+    function getColor(i) {
+      if (!state.palette || !state.palette.length) {
+        state.palette = [...defaultPalette];
+      }
+      return state.palette[i % state.palette.length];
+    }
+
+    function tinyColor(color) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = color;
+      const computed = ctx.fillStyle;
+      const { r, g, b } = hexToRgb(computed);
+      return {
+        setAlpha(alpha) {
+          return {
+            toRgbString() {
+              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+          };
+        },
+        toRgbString() {
+          return `rgba(${r}, ${g}, ${b}, 1)`;
+        }
+      };
+    }
+
+    function hexToRgb(hex) {
+      let sanitized = hex.replace('#', '');
+      if (sanitized.length === 3) {
+        sanitized = sanitized.split('').map((char) => char + char).join('');
+      }
+      const bigint = parseInt(sanitized, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return { r, g, b };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadInitialPreferences();
+      attachEvents();
+      renderTopModeButtons();
+      renderTablePlaceholder();
+    });
+  </script>
+</body>
+</html>
